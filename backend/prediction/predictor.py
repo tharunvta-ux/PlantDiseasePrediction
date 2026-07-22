@@ -184,3 +184,30 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# -----------------------------------------------------
+# Reusable Prediction Function
+# -----------------------------------------------------
+
+_predictor = PlantDiseasePredictor()
+
+
+def predict_image(image_path: str) -> dict:
+    """
+    Predict plant disease for an image and return
+    the result as a dictionary for the Flask API.
+    """
+
+    predicted_class, confidence, top3 = _predictor.predict(image_path)
+
+    return {
+        "predicted_class": predicted_class,
+        "confidence": round(confidence, 2),
+        "top3_predictions": [
+            {
+                "class": name,
+                "confidence": round(score, 2),
+            }
+            for name, score in top3
+        ],
+    }
