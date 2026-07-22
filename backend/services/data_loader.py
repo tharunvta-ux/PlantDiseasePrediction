@@ -24,7 +24,7 @@ import tensorflow as tf
 # ==========================================================
 
 IMAGE_SIZE: tuple[int, int] = (256, 256)
-BATCH_SIZE: int = 32
+BATCH_SIZE: int = 16
 SEED: int = 42
 NORMALIZATION_DIVISOR: float = 255.0
 
@@ -131,7 +131,7 @@ class DataLoader:
             num_parallel_calls=tf.data.AUTOTUNE,
         )
 
-        dataset = dataset.cache()
+        #dataset = dataset.cache()
 
         dataset = dataset.prefetch(
             buffer_size=tf.data.AUTOTUNE
