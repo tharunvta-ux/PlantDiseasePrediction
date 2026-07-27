@@ -9,6 +9,7 @@ import os
 
 from flask import Flask
 
+from backend.routes.frontend_routes import frontend_bp
 from backend.routes.prediction_routes import prediction_bp
 
 
@@ -33,6 +34,7 @@ def create_app() -> Flask:
     )
 
     app.register_blueprint(prediction_bp)
+    app.register_blueprint(frontend_bp)
 
     return app
 
