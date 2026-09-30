@@ -185,6 +185,7 @@ img { max-width: 100%; display: block; }
 .stat-value { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; color: var(--foreground); }
 .stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
 .stat-divider { width: 1px; height: 2rem; background: var(--border); }
+.hero-footnote { margin-top: 1rem; max-width: 32rem; font-size: 0.75rem; color: var(--muted-foreground); }
 
 .hero-visual { position: relative; }
 .hero-glow {
@@ -392,6 +393,136 @@ img { max-width: 100%; display: block; }
 }
 .result-error p { font-size: 0.875rem; color: oklch(0.6 0.22 27); }
 
+/* ---------- Confidence level / result details ---------- */
+
+.level-banner {
+  margin-bottom: 1rem;
+  border-radius: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.level-banner.level-high {
+  border-color: oklch(0.58 0.16 150 / 0.25);
+  background: oklch(0.58 0.16 150 / 0.08);
+  color: oklch(0.42 0.12 150);
+}
+.level-banner.level-uncertain {
+  border-color: oklch(0.75 0.15 75 / 0.35);
+  background: oklch(0.85 0.12 85 / 0.18);
+  color: oklch(0.45 0.1 65);
+}
+.level-banner.level-low {
+  border-color: oklch(0.6 0.22 27 / 0.25);
+  background: oklch(0.6 0.22 27 / 0.06);
+  color: oklch(0.52 0.2 27);
+}
+
+.confidence-badge.level-uncertain { background: oklch(0.85 0.12 85 / 0.25); color: oklch(0.45 0.1 65); }
+.confidence-badge.level-low { background: oklch(0.6 0.22 27 / 0.1); color: oklch(0.55 0.2 27); }
+
+.result-chips { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chip {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: oklch(1 0 0 / 0.6);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+.chip.chip-healthy { border-color: oklch(0.58 0.16 150 / 0.3); color: var(--primary); }
+.chip.chip-diseased { border-color: oklch(0.6 0.22 27 / 0.3); color: oklch(0.55 0.2 27); }
+.chip.chip-uncertain { border-color: oklch(0.75 0.15 75 / 0.4); color: oklch(0.45 0.1 65); }
+
+.result-message { margin-top: 0.75rem; font-size: 0.875rem; color: var(--muted-foreground); }
+
+.quality-warnings {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: oklch(0.45 0.1 65);
+}
+.quality-warnings li::before { content: "⚠ "; }
+
+/* ---------- Treatment guidance ---------- */
+
+.treatment-panel {
+  margin-top: 1.5rem;
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.treatment-loading {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.treatment-note {
+  margin-top: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: oklch(1 0 0 / 0.5);
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.retry-btn { margin-top: 0.75rem; padding: 0.5rem 1.25rem; }
+
+.treatment-summary { margin-top: 1.25rem; }
+.treatment-summary h4 { margin-top: 0.25rem; font-size: 1.25rem; font-weight: 700; }
+.treatment-meaning { margin-top: 0.5rem; font-size: 0.9375rem; line-height: 1.55; }
+.treatment-uncertainty {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: oklch(0.45 0.1 65);
+}
+.treatment-uncertainty:empty { display: none; }
+
+.treatment-grid { margin-top: 1.25rem; display: grid; gap: 1rem; }
+
+.treatment-card {
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: oklch(1 0 0 / 0.55);
+  padding: 1rem 1.25rem;
+}
+.treatment-card h5 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+.treatment-card ul {
+  margin-top: 0.625rem;
+  padding-left: 1.1rem;
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.treatment-card .empty-item { list-style: none; margin-left: -1.1rem; color: var(--muted-foreground); }
+
+.treatment-meta { margin-top: 1.25rem; font-size: 0.75rem; color: var(--muted-foreground); }
+.treatment-disclaimer {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
 /* ---------- Features ---------- */
 
 .features { padding-top: 4rem; padding-bottom: 4rem; }
@@ -448,6 +579,8 @@ img { max-width: 100%; display: block; }
   .footer-brand { grid-column: span 2; }
   .site-header, .hero, .detect, .features, .site-footer { padding-left: 1.5rem; padding-right: 1.5rem; }
   .footer-bottom { flex-direction: row; align-items: center; }
+  .treatment-grid { grid-template-columns: repeat(2, 1fr); }
+  .treatment-card-wide { grid-column: span 2; }
 }
 
 @media (min-width: 1024px) {

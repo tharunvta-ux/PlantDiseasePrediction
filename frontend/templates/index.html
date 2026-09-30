@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verdant — AI Plant Disease Detection</title>
-  <meta name="description" content="Instantly diagnose plant diseases from a single photo. Verdant uses AI to identify issues and recommend action." />
+  <meta name="description" content="Upload a leaf photo to get an AI disease prediction with confidence levels and AI-generated treatment guidance." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" />
   <link rel="stylesheet" href="{{ url_for('frontend.static', filename='css/style.css') }}" />
@@ -41,13 +41,13 @@
     <div class="hero-grid">
       <div>
         <span class="badge">
-          <span class="badge-dot"></span> AI vision · 38 crops · 87 diseases
+          <span class="badge-dot"></span> AI vision · 14 crops · 38 leaf classes
         </span>
         <h1 class="hero-title">
-          Diagnose plant disease <span class="gradient-text">in seconds.</span>
+          Check plant leaves <span class="gradient-text">for disease.</span>
         </h1>
         <p class="hero-copy">
-          Snap a leaf, upload a photo, get a lab‑grade diagnosis with recommended treatment — powered by a vision model trained on 2.4M field images.
+          Upload a photo of a leaf to get a disease prediction with an honest confidence level and AI‑generated treatment guidance — from a CNN trained on the PlantVillage leaf dataset.
         </p>
         <div class="hero-cta">
           <a href="#detect" class="btn-primary btn-pill">Detect now</a>
@@ -55,20 +55,23 @@
         </div>
         <div class="hero-stats">
           <div class="stat">
-            <div class="stat-value">98.7%</div>
-            <div class="stat-label">Accuracy</div>
+            <div class="stat-value">93%</div>
+            <div class="stat-label">Accuracy on lab images*</div>
           </div>
           <div class="stat-divider"></div>
           <div class="stat">
-            <div class="stat-value">&lt; 2s</div>
-            <div class="stat-label">Diagnosis</div>
+            <div class="stat-value">38</div>
+            <div class="stat-label">Leaf classes</div>
           </div>
           <div class="stat-divider"></div>
           <div class="stat">
-            <div class="stat-value">87+</div>
-            <div class="stat-label">Diseases</div>
+            <div class="stat-value">14</div>
+            <div class="stat-label">Crops</div>
           </div>
         </div>
+        <p class="hero-footnote">
+          *Held-out PlantVillage validation images (lab photos, plain backgrounds). Accuracy on real-world field photos has not been measured and is expected to be lower.
+        </p>
       </div>
 
       <div class="hero-visual">
@@ -77,7 +80,7 @@
           <div class="hero-card-top">
             <div class="hero-card-live">
               <span class="live-dot"></span>
-              <span>Live analysis</span>
+              <span>Example result</span>
             </div>
             <span class="hero-card-file">apple_leaf_0247.jpg</span>
           </div>
@@ -131,8 +134,8 @@
   <!-- Detect / Upload -->
   <section id="detect" class="detect">
     <div class="section-heading">
-      <h2>Upload a leaf, get an instant diagnosis</h2>
-      <p>Drop a clear, well‑lit image of a single leaf. JPG or PNG, up to 10MB.</p>
+      <h2>Upload a leaf, get a prediction</h2>
+      <p>Drop a clear, well‑lit image of a single leaf that fills most of the frame. JPG or PNG, up to 10MB.</p>
     </div>
 
     <div class="detect-grid">
@@ -196,14 +199,25 @@
         </div>
 
         <div id="resultContent" class="result-content hidden">
-          <p class="result-eyebrow">Predicted disease</p>
+          <div id="levelBanner" class="level-banner hidden" role="status"></div>
+
+          <p id="resultEyebrow" class="result-eyebrow">Predicted disease</p>
           <div class="result-title-row">
             <h4 id="resultClass"></h4>
             <span id="resultConfidence" class="confidence-badge"></span>
           </div>
 
+          <div id="resultChips" class="result-chips">
+            <span id="cropChip" class="chip"></span>
+            <span id="healthChip" class="chip"></span>
+          </div>
+
+          <p id="resultMessage" class="result-message"></p>
+
+          <ul id="qualityWarnings" class="quality-warnings hidden"></ul>
+
           <div class="top3-section">
-            <p class="result-eyebrow">Top predictions</p>
+            <p id="top3Eyebrow" class="result-eyebrow">Top predictions</p>
             <div id="top3List" class="top3-list"></div>
           </div>
         </div>
@@ -213,28 +227,85 @@
         </div>
       </div>
     </div>
+
+    <!-- Treatment guidance (LLM) -->
+    <div id="treatmentPanel" class="treatment-panel glass hidden" aria-live="polite">
+      <div class="result-header">
+        <h3>Treatment guidance</h3>
+        <span class="status-badge">AI-generated</span>
+      </div>
+
+      <div id="treatmentLoading" class="treatment-loading hidden">
+        <div class="spinner"></div>
+        <p>Preparing treatment and prevention guidance…</p>
+      </div>
+
+      <div id="treatmentUnavailable" class="treatment-note hidden">
+        <p id="treatmentUnavailableText"></p>
+      </div>
+
+      <div id="treatmentError" class="result-error hidden">
+        <p id="treatmentErrorText"></p>
+        <button id="treatmentRetryBtn" class="btn-outline btn-pill retry-btn" type="button">Try again</button>
+      </div>
+
+      <div id="treatmentContent" class="hidden">
+        <div class="treatment-summary">
+          <p class="result-eyebrow">Condition</p>
+          <h4 id="guidanceDisease"></h4>
+          <p id="guidanceMeaning" class="treatment-meaning"></p>
+          <p id="guidanceUncertainty" class="treatment-uncertainty"></p>
+        </div>
+
+        <div class="treatment-grid">
+          <section class="treatment-card">
+            <h5>Common symptoms</h5>
+            <ul id="guidanceSymptoms"></ul>
+          </section>
+          <section class="treatment-card">
+            <h5>Immediate steps</h5>
+            <ul id="guidanceImmediate"></ul>
+          </section>
+          <section class="treatment-card">
+            <h5>Recommended treatment</h5>
+            <ul id="guidanceTreatment"></ul>
+          </section>
+          <section class="treatment-card">
+            <h5>Preventive measures</h5>
+            <ul id="guidancePrevention"></ul>
+          </section>
+          <section class="treatment-card treatment-card-wide">
+            <h5>When to seek expert help</h5>
+            <ul id="guidanceExpert"></ul>
+          </section>
+        </div>
+
+        <p id="guidanceMeta" class="treatment-meta"></p>
+        <p id="guidanceDisclaimer" class="treatment-disclaimer"></p>
+      </div>
+    </div>
   </section>
 
   <!-- Features -->
   <section id="features" class="features">
     <div class="section-heading">
-      <h2>Built for growers, backed by science</h2>
-      <p>The same technology used by agronomists and greenhouses worldwide — now in your pocket.</p>
+      <h2>Built to support growers</h2>
+      <p>Deep-learning leaf analysis with transparent confidence — a first check that complements, not replaces, local agronomy advice.</p>
     </div>
     <div class="features-grid">
       <div class="feature-card glass">
         <div class="feature-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" fill="currentColor"/></svg>
         </div>
-        <h3>Instant diagnosis</h3>
-        <p>Sub‑2‑second inference on a fine‑tuned vision model optimized for foliage.</p>
+        <h3>Quick prediction</h3>
+        <p>A convolutional neural network trained on PlantVillage leaf images returns its top predictions with confidence scores.</p>
       </div>
       <div class="feature-card glass">
         <div class="feature-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2 4 5v7c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3Z" fill="currentColor"/></svg>
         </div>
-        <h3>Lab‑grade accuracy</h3>
-        <p>98.7% top‑1 accuracy across 87 diseases and 38 crops, validated on field data.</p>
+        <h3>Honest confidence</h3>
+        <p>Calibrated confidence levels. When the model is unsure it says so and asks for a clearer photo instead of guessing.</p>
       </div>
       <div class="feature-card glass">
         <div class="feature-icon">
@@ -244,8 +315,8 @@
             <path d="M12 15c0-3-2-6-8-6 0 4 3 7 8 7Z" fill="currentColor" opacity=".7"/>
           </svg>
         </div>
-        <h3>Actionable treatment</h3>
-        <p>Every diagnosis ships with step‑by‑step treatment and organic alternatives.</p>
+        <h3>Treatment guidance</h3>
+        <p>AI-generated explanation, treatment and prevention steps for the predicted disease. Always confirm with local agricultural experts.</p>
       </div>
     </div>
   </section>

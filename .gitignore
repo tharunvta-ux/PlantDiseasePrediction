@@ -32,6 +32,7 @@ dataset/
 logs/
 uploads/
 saved_models/
+results/calibration/*.npz
 
 # ===============================
 # ML Model Files

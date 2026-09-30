@@ -10,20 +10,17 @@ from flask import Blueprint
 from flask import current_app
 from flask import jsonify
 from flask import request
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
-from backend.prediction.predictor import predict_image
+from backend.config import ALLOWED_EXTENSIONS
+from backend.services.prediction_service import analyze_image
 
 prediction_bp = Blueprint(
     "prediction",
     __name__
 )
 
-ALLOWED_EXTENSIONS = {
-    "jpg",
-    "jpeg",
-    "png"
-}
+logger = logging.getLogger(__name__)
 
 
 def allowed_file(filename: str) -> bool:
@@ -54,6 +51,10 @@ def home():
 def predict():
     """
     Predict disease from uploaded image.
+
+    Response keeps the original fields (predicted_class, confidence,
+    top3_predictions) and adds crop, health, calibrated confidence,
+    confidence_level, quality_warnings and message.
     """
 
     if "file" not in request.files:
@@ -86,25 +87,26 @@ def predict():
 
         file.save(filepath)
 
-        Image.open(filepath).verify()
+        try:
+            with Image.open(filepath) as image:
+                image.verify()
+        except (UnidentifiedImageError, OSError, SyntaxError):
+            return jsonify(
+                {"error": "The uploaded file is not a valid image"}
+            ), 400
 
-        prediction = predict_image(filepath)
+        prediction = analyze_image(filepath)
+
+        return jsonify(prediction), 200
+
+    except Exception:
+
+        logger.exception("Prediction failed")
 
         return jsonify(
             {
-                "predicted_class": prediction["predicted_class"],
-                "confidence": prediction["confidence"],
-                "top3_predictions": prediction["top3_predictions"]
-            }
-        ), 200
-
-    except Exception as e:
-
-        logging.exception("Prediction failed")
-
-        return jsonify(
-            {
-                "error": str(e)
+                "error": "Prediction failed due to a server error. "
+                         "Please try again."
             }
         ), 500
 

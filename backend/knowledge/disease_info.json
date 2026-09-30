@@ -1,0 +1,295 @@
+{
+  "_meta": {
+    "purpose": "Grounding facts passed to the LLM with each prediction. Keeps the LLM from e.g. recommending fungicides for a viral disease.",
+    "expert_reviewed": false,
+    "review_note": "Drafted from widely documented plant-pathology facts. Must be reviewed by an agronomist / extension specialist before production use.",
+    "pathogen_types": ["fungal", "bacterial", "viral", "oomycete", "pest", "none"]
+  },
+  "Apple___Apple_scab": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Venturia inaequalis",
+    "key_facts": [
+      "Overwinters in fallen infected leaves; spreads by rain-splashed spores in cool, wet spring weather.",
+      "Removing or shredding fallen leaves reduces next season's infection.",
+      "Resistant apple varieties exist."
+    ]
+  },
+  "Apple___Black_rot": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Botryosphaeria obtusa (Diplodia seriata)",
+    "key_facts": [
+      "Affects leaves (frog-eye leaf spot), fruit and branches (cankers).",
+      "Survives in dead wood, cankers and mummified fruit, which should be pruned out and removed."
+    ]
+  },
+  "Apple___Cedar_apple_rust": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Gymnosporangium juniperi-virginianae",
+    "key_facts": [
+      "Requires two hosts: apple and eastern red cedar / juniper.",
+      "Cannot spread from apple to apple; removing nearby juniper galls reduces infection.",
+      "Resistant apple varieties exist."
+    ]
+  },
+  "Apple___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Blueberry___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Cherry_(including_sour)___Powdery_mildew": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Podosphaera clandestina",
+    "key_facts": [
+      "White powdery growth on leaves and shoots.",
+      "Favoured by humid conditions and poor air circulation; unlike most fungi it does not need free water on leaves."
+    ]
+  },
+  "Cherry_(including_sour)___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Cercospora zeae-maydis",
+    "key_facts": [
+      "Long, narrow, rectangular grey-tan lesions bounded by leaf veins.",
+      "Survives in corn residue; favoured by warm, humid weather and continuous corn / no-till.",
+      "Crop rotation, residue management and resistant hybrids are primary controls."
+    ]
+  },
+  "Corn_(maize)___Common_rust_": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Puccinia sorghi",
+    "key_facts": [
+      "Cinnamon-brown pustules on both leaf surfaces.",
+      "Spores are wind-borne over long distances; resistant hybrids are the main control."
+    ]
+  },
+  "Corn_(maize)___Northern_Leaf_Blight": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Exserohilum turcicum (Setosphaeria turcica)",
+    "key_facts": [
+      "Long, elliptical, grey-green to tan 'cigar-shaped' lesions.",
+      "Survives in corn residue; favoured by moderate temperatures and long leaf-wetness periods.",
+      "Resistant hybrids, rotation and residue management are primary controls."
+    ]
+  },
+  "Corn_(maize)___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Grape___Black_rot": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Guignardia bidwellii (Phyllosticta ampelicida)",
+    "key_facts": [
+      "Tan leaf spots with dark borders; infected berries shrivel into hard black mummies.",
+      "Mummified berries are the main overwintering source and should be removed."
+    ]
+  },
+  "Grape___Esca_(Black_Measles)": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Grapevine trunk disease complex (e.g. Phaeomoniella chlamydospora, Phaeoacremonium spp.)",
+    "key_facts": [
+      "A wood/trunk disease; leaf 'tiger-stripe' symptoms are a sign of internal wood infection.",
+      "Enters through pruning wounds; there is no curative foliar treatment.",
+      "Management focuses on pruning hygiene, wound protection and removing dead wood."
+    ]
+  },
+  "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Pseudocercospora vitis (Isariopsis clavispora)",
+    "key_facts": [
+      "Irregular dark brown leaf spots, typically later in the season.",
+      "Favoured by warm, humid conditions; canopy management improves air flow."
+    ]
+  },
+  "Grape___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Orange___Haunglongbing_(Citrus_greening)": {
+    "pathogen_type": "bacterial",
+    "causal_agent": "'Candidatus Liberibacter' spp. (phloem-limited bacteria)",
+    "key_facts": [
+      "Spread by the Asian citrus psyllid and by grafting infected material.",
+      "There is no cure; infected trees decline and are usually removed.",
+      "Regulated / quarantine disease in many countries - suspected cases should be reported to the local plant-protection authority.",
+      "Management: psyllid control, certified clean nursery stock, removal of infected trees."
+    ]
+  },
+  "Peach___Bacterial_spot": {
+    "pathogen_type": "bacterial",
+    "causal_agent": "Xanthomonas arboricola pv. pruni",
+    "key_facts": [
+      "Small angular leaf spots that may fall out ('shot-hole'); fruit spotting.",
+      "Spread by wind-driven rain; favoured by warm, wet weather.",
+      "Fungicides do not control bacteria; copper-based bactericides are the usual chemical category, with resistant varieties preferred."
+    ]
+  },
+  "Peach___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Pepper,_bell___Bacterial_spot": {
+    "pathogen_type": "bacterial",
+    "causal_agent": "Xanthomonas spp. (e.g. X. euvesicatoria)",
+    "key_facts": [
+      "Water-soaked spots that turn brown; can cause leaf drop.",
+      "Seed-borne and spread by splashing water and handling wet plants.",
+      "Use certified disease-free seed/transplants; avoid overhead irrigation; copper-based products are the usual chemical category."
+    ]
+  },
+  "Pepper,_bell___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Potato___Early_blight": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Alternaria solani",
+    "key_facts": [
+      "Dark brown spots with concentric 'target' rings, usually starting on older, lower leaves.",
+      "Survives in plant debris and soil; stressed or nutrient-deficient plants are more susceptible."
+    ]
+  },
+  "Potato___Late_blight": {
+    "pathogen_type": "oomycete",
+    "causal_agent": "Phytophthora infestans",
+    "key_facts": [
+      "Water-soaked lesions that spread rapidly in cool, wet weather; white growth on leaf undersides.",
+      "Can destroy a crop within days and spreads to neighbouring fields - act quickly.",
+      "Oomycetes need specific active ingredients; not every fungicide is effective.",
+      "Destroy infected plants and cull piles; use certified seed tubers."
+    ]
+  },
+  "Potato___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Raspberry___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Soybean___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Squash___Powdery_mildew": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Podosphaera xanthii (also Golovinomyces spp.)",
+    "key_facts": [
+      "White powdery patches on leaves; reduces yield and fruit quality.",
+      "Favoured by high humidity and shade; does not need free water on leaves.",
+      "Resistant varieties are available."
+    ]
+  },
+  "Strawberry___Leaf_scorch": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Diplocarpon earlianum",
+    "key_facts": [
+      "Small purple spots that merge, making leaves look scorched.",
+      "Survives on infected leaves; renovating beds and removing old leaves reduces inoculum."
+    ]
+  },
+  "Strawberry___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  },
+  "Tomato___Bacterial_spot": {
+    "pathogen_type": "bacterial",
+    "causal_agent": "Xanthomonas spp. (X. euvesicatoria, X. vesicatoria, X. perforans, X. gardneri)",
+    "key_facts": [
+      "Small dark, greasy-looking leaf spots; fruit spots.",
+      "Seed-borne; spread by splashing water, tools and handling wet plants.",
+      "Fungicides do not control bacteria; copper-based products are the usual chemical category but resistance is common."
+    ]
+  },
+  "Tomato___Early_blight": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Alternaria solani / Alternaria linariae",
+    "key_facts": [
+      "Concentric-ring 'target' spots, starting on older lower leaves.",
+      "Survives in debris and soil; mulching and removing lower infected leaves reduce splash spread."
+    ]
+  },
+  "Tomato___Late_blight": {
+    "pathogen_type": "oomycete",
+    "causal_agent": "Phytophthora infestans",
+    "key_facts": [
+      "Large, dark, water-soaked lesions; white growth under leaves in humid weather; rapid spread.",
+      "Can destroy plants within days and spreads between gardens/fields - act quickly.",
+      "Oomycetes need specific active ingredients; not every fungicide is effective.",
+      "Remove and bag/destroy infected plants; do not compost."
+    ]
+  },
+  "Tomato___Leaf_Mold": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Passalora fulva (Cladosporium fulvum)",
+    "key_facts": [
+      "Pale yellow spots on upper leaf surface with olive-green to brown mould underneath.",
+      "Mainly a greenhouse / high-tunnel problem at high humidity; improving ventilation is key.",
+      "Resistant varieties exist."
+    ]
+  },
+  "Tomato___Septoria_leaf_spot": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Septoria lycopersici",
+    "key_facts": [
+      "Many small circular spots with dark borders and light centres, starting on lower leaves.",
+      "Survives on plant debris and solanaceous weeds; spread by splashing water."
+    ]
+  },
+  "Tomato___Spider_mites Two-spotted_spider_mite": {
+    "pathogen_type": "pest",
+    "causal_agent": "Tetranychus urticae (two-spotted spider mite)",
+    "key_facts": [
+      "A pest (arachnid), not a disease: fine stippling/yellowing of leaves, webbing on undersides.",
+      "Favoured by hot, dry, dusty conditions; broad-spectrum insecticides can make outbreaks worse by killing natural predators.",
+      "Fungicides are not effective; options include water sprays, predatory mites, insecticidal soaps/oils or labelled miticides."
+    ]
+  },
+  "Tomato___Target_Spot": {
+    "pathogen_type": "fungal",
+    "causal_agent": "Corynespora cassiicola",
+    "key_facts": [
+      "Brown lesions with concentric rings; can be confused with early blight.",
+      "Favoured by warm, humid conditions; survives on crop debris."
+    ]
+  },
+  "Tomato___Tomato_Yellow_Leaf_Curl_Virus": {
+    "pathogen_type": "viral",
+    "causal_agent": "Tomato yellow leaf curl virus (begomovirus)",
+    "key_facts": [
+      "Transmitted by the whitefly Bemisia tabaci.",
+      "There is no chemical cure for a virus-infected plant; infected plants should be removed.",
+      "Management: whitefly control, insect-proof netting, resistant varieties, weed control."
+    ]
+  },
+  "Tomato___Tomato_mosaic_virus": {
+    "pathogen_type": "viral",
+    "causal_agent": "Tomato mosaic virus (tobamovirus)",
+    "key_facts": [
+      "Very stable virus spread mechanically by hands, tools and seed; not insect-transmitted.",
+      "There is no chemical cure; remove infected plants.",
+      "Disinfect tools and wash hands; use certified seed and resistant varieties."
+    ]
+  },
+  "Tomato___healthy": {
+    "pathogen_type": "none",
+    "causal_agent": null,
+    "key_facts": ["No disease detected on this leaf."]
+  }
+}

@@ -19,12 +19,46 @@
   const top3List = document.getElementById("top3List");
   const resultError = document.getElementById("resultError");
   const errorMessage = document.getElementById("errorMessage");
+  const resultEyebrow = document.getElementById("resultEyebrow");
+  const levelBanner = document.getElementById("levelBanner");
+  const cropChip = document.getElementById("cropChip");
+  const healthChip = document.getElementById("healthChip");
+  const resultMessage = document.getElementById("resultMessage");
+  const qualityWarnings = document.getElementById("qualityWarnings");
+  const top3Eyebrow = document.getElementById("top3Eyebrow");
+  const resultChips = document.getElementById("resultChips");
+
+  const treatmentPanel = document.getElementById("treatmentPanel");
+  const treatmentLoading = document.getElementById("treatmentLoading");
+  const treatmentUnavailable = document.getElementById("treatmentUnavailable");
+  const treatmentUnavailableText = document.getElementById("treatmentUnavailableText");
+  const treatmentError = document.getElementById("treatmentError");
+  const treatmentErrorText = document.getElementById("treatmentErrorText");
+  const treatmentRetryBtn = document.getElementById("treatmentRetryBtn");
+  const treatmentContent = document.getElementById("treatmentContent");
 
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
   let selectedFile = null;
   let objectUrl = null;
+  let lastPrediction = null;
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+  let recommendationController = null;
+
+  const LEVEL_TEXT = {
+    high: "High confidence",
+    uncertain: "Uncertain",
+    low: "Low confidence",
+  };
+
+  const LEVEL_BANNER = {
+    high: "High-confidence prediction.",
+    uncertain:
+      "Uncertain prediction — the model is not sure. Treat this as a possible diagnosis and compare the alternatives below.",
+    low:
+      "Result uncertain — no diagnosis shown. Please upload a clearer, well-lit photo of a single leaf.",
+  };
 
   function formatClassName(rawName) {
     return rawName
@@ -56,6 +90,7 @@
 
   function resetResultPanel(message) {
     setStatus("idle");
+    resetTreatmentPanel();
     resultSkeleton.classList.remove("hidden");
     resultContent.classList.add("hidden");
     resultError.classList.add("hidden");
@@ -65,6 +100,8 @@
 
   function showLoading() {
     setStatus("loading");
+    lastPrediction = null;
+    resetTreatmentPanel();
     resultSkeleton.classList.remove("hidden");
     resultContent.classList.add("hidden");
     resultError.classList.add("hidden");
@@ -77,11 +114,56 @@
     resultError.classList.add("hidden");
     resultContent.classList.remove("hidden");
 
-    resultClass.textContent = formatClassName(data.predicted_class);
-    resultConfidence.textContent = `${data.confidence.toFixed(2)}%`;
+    const level = data.confidence_level || null;
+    const shownConfidence =
+      typeof data.calibrated_confidence === "number"
+        ? data.calibrated_confidence
+        : data.confidence;
+
+    levelBanner.className = "level-banner hidden";
+    resultConfidence.className = "confidence-badge";
+
+    if (level) {
+      levelBanner.textContent = LEVEL_BANNER[level] || "";
+      levelBanner.classList.add(`level-${level}`);
+      levelBanner.classList.toggle("hidden", level === "high");
+      resultConfidence.classList.add(`level-${level}`);
+    }
+
+    if (level === "low") {
+      resultEyebrow.textContent = "Result";
+      resultClass.textContent = "Uncertain result";
+      resultConfidence.textContent = LEVEL_TEXT.low;
+      top3Eyebrow.textContent = "Possible matches (not a diagnosis)";
+    } else {
+      resultEyebrow.textContent =
+        level === "uncertain" ? "Possible diagnosis" : "Predicted disease";
+      resultClass.textContent = formatClassName(data.predicted_class);
+      resultConfidence.textContent =
+        `${shownConfidence.toFixed(2)}%` + (level ? ` · ${LEVEL_TEXT[level]}` : "");
+      top3Eyebrow.textContent = "Top predictions (model scores)";
+    }
+
+    renderChips(data, level);
+
+    resultMessage.textContent = data.message || "";
+    resultMessage.classList.toggle("hidden", !data.message);
+
+    qualityWarnings.innerHTML = "";
+    (data.quality_warnings || []).forEach((warning) => {
+      const li = document.createElement("li");
+      li.textContent = warning.message;
+      qualityWarnings.appendChild(li);
+    });
+    qualityWarnings.classList.toggle(
+      "hidden",
+      !(data.quality_warnings && data.quality_warnings.length)
+    );
 
     top3List.innerHTML = "";
     data.top3_predictions.forEach((item, index) => {
+      const highlight = index === 0 && level !== "low" ? " highlight" : "";
+
       const row = document.createElement("div");
       row.className = "bar-row";
 
@@ -89,11 +171,11 @@
       top.className = "bar-row-top";
 
       const label = document.createElement("span");
-      label.className = "bar-label" + (index === 0 ? " highlight" : "");
+      label.className = "bar-label" + highlight;
       label.textContent = formatClassName(item.class);
 
       const value = document.createElement("span");
-      value.className = "bar-value" + (index === 0 ? " highlight" : "");
+      value.className = "bar-value" + highlight;
       value.textContent = `${item.confidence.toFixed(2)}%`;
 
       top.appendChild(label);
@@ -102,7 +184,7 @@
       const track = document.createElement("div");
       track.className = "bar-track";
       const fill = document.createElement("div");
-      fill.className = "bar-fill" + (index === 0 ? " highlight" : "");
+      fill.className = "bar-fill" + highlight;
       fill.style.width = `${Math.min(item.confidence, 100)}%`;
       track.appendChild(fill);
 
@@ -110,6 +192,24 @@
       row.appendChild(track);
       top3List.appendChild(row);
     });
+  }
+
+  function renderChips(data, level) {
+    const hasDetails = Boolean(data.crop && data.health_status);
+    resultChips.classList.toggle("hidden", !hasDetails);
+    if (!hasDetails) return;
+
+    cropChip.textContent =
+      level === "low"
+        ? `Plant: uncertain`
+        : `Plant: ${data.crop} (${data.crop_confidence.toFixed(1)}%)`;
+
+    const status = data.health_status;
+    healthChip.className = `chip chip-${status}`;
+    healthChip.textContent =
+      status === "healthy" ? "Appears healthy"
+        : status === "diseased" ? "Signs of disease"
+          : "Health status uncertain";
   }
 
   function showError(message) {
@@ -120,10 +220,142 @@
     errorMessage.textContent = message || "Something went wrong. Please try again.";
   }
 
+  /* ---------- Treatment guidance ---------- */
+
+  function hideTreatmentStates() {
+    treatmentLoading.classList.add("hidden");
+    treatmentUnavailable.classList.add("hidden");
+    treatmentError.classList.add("hidden");
+    treatmentContent.classList.add("hidden");
+  }
+
+  function resetTreatmentPanel() {
+    if (recommendationController) recommendationController.abort();
+    recommendationController = null;
+    hideTreatmentStates();
+    treatmentPanel.classList.add("hidden");
+  }
+
+  function fillList(element, items) {
+    element.innerHTML = "";
+    const list = items && items.length ? items : null;
+    if (!list) {
+      const li = document.createElement("li");
+      li.className = "empty-item";
+      li.textContent = "No specific items.";
+      element.appendChild(li);
+      return;
+    }
+    list.forEach((text) => {
+      const li = document.createElement("li");
+      li.textContent = text;
+      element.appendChild(li);
+    });
+  }
+
+  function showTreatment(result) {
+    const g = result.guidance;
+    hideTreatmentStates();
+    treatmentContent.classList.remove("hidden");
+
+    document.getElementById("guidanceDisease").textContent = g.disease;
+    document.getElementById("guidanceMeaning").textContent = g.what_it_means;
+    document.getElementById("guidanceUncertainty").textContent =
+      result.confidence_level === "uncertain" ? g.uncertainty_note : "";
+
+    fillList(document.getElementById("guidanceSymptoms"), g.common_symptoms);
+    fillList(document.getElementById("guidanceImmediate"), g.immediate_steps);
+    fillList(document.getElementById("guidanceTreatment"), g.recommended_treatment);
+    fillList(document.getElementById("guidancePrevention"), g.preventive_measures);
+    fillList(document.getElementById("guidanceExpert"), g.when_to_seek_expert_help);
+
+    const grounding = result.grounding || {};
+    const meta = [];
+    if (grounding.pathogen_type && grounding.pathogen_type !== "none") {
+      meta.push(`Pathogen type: ${grounding.pathogen_type}`);
+    }
+    if (grounding.causal_agent) meta.push(`Causal agent: ${grounding.causal_agent}`);
+    if (grounding.knowledge_expert_reviewed === false) {
+      meta.push("Reference facts not yet reviewed by an agronomist");
+    }
+    if (result.generated_by) meta.push(`Generated by ${result.generated_by.model}`);
+    document.getElementById("guidanceMeta").textContent = meta.join(" · ");
+    document.getElementById("guidanceDisclaimer").textContent = result.disclaimer || "";
+  }
+
+  function showTreatmentError(message) {
+    hideTreatmentStates();
+    treatmentError.classList.remove("hidden");
+    treatmentErrorText.textContent =
+      message || "Could not load treatment guidance. Please try again.";
+  }
+
+  async function requestRecommendation(prediction) {
+    if (recommendationController) recommendationController.abort();
+    const controller = new AbortController();
+    recommendationController = controller;
+
+    treatmentPanel.classList.remove("hidden");
+    hideTreatmentStates();
+
+    if (!prediction.confidence_level) {
+      treatmentUnavailable.classList.remove("hidden");
+      treatmentUnavailableText.textContent =
+        "Treatment guidance needs a confidence assessment, which this server did not return.";
+      return;
+    }
+
+    if (prediction.confidence_level === "low") {
+      treatmentUnavailable.classList.remove("hidden");
+      treatmentUnavailableText.textContent =
+        "Treatment guidance is only generated when the prediction is reliable enough. " +
+        "Upload a clearer photo of a single leaf to get guidance.";
+      return;
+    }
+
+    treatmentLoading.classList.remove("hidden");
+
+    try {
+      const response = await fetch("/recommendation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          predicted_class: prediction.predicted_class,
+          confidence_level: prediction.confidence_level,
+          top3_predictions: prediction.top3_predictions,
+        }),
+        signal: controller.signal,
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_) {
+        data = null;
+      }
+
+      if (controller !== recommendationController) return;
+
+      if (!response.ok || !data || !data.guidance) {
+        showTreatmentError(data && data.error);
+        return;
+      }
+
+      showTreatment(data);
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      showTreatmentError("Could not reach the server for treatment guidance. Please try again.");
+    }
+  }
+
   function handleFiles(files) {
     if (!files || !files[0]) return;
     const file = files[0];
     if (!file.type.startsWith("image/")) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      showError("File is too large. Maximum size is 10 MB.");
+      return;
+    }
 
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = URL.createObjectURL(file);
@@ -171,14 +403,21 @@
         body: formData,
       });
 
-      const data = await response.json();
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_) {
+        data = null;
+      }
 
-      if (!response.ok) {
-        showError(data.error);
+      if (!response.ok || !data) {
+        showError(data && data.error ? data.error : `Server error (${response.status}). Please try again.`);
         return;
       }
 
+      lastPrediction = data;
       showResult(data);
+      requestRecommendation(data);
     } catch (err) {
       showError("Could not reach the prediction server. Please try again.");
     } finally {
@@ -211,4 +450,7 @@
   removeImageBtn.addEventListener("click", removeImage);
   removeBtn.addEventListener("click", removeImage);
   predictBtn.addEventListener("click", predict);
+  treatmentRetryBtn.addEventListener("click", () => {
+    if (lastPrediction) requestRecommendation(lastPrediction);
+  });
 })();

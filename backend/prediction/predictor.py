@@ -6,12 +6,21 @@ Plant Disease Prediction using trained CNN model.
 
 from __future__ import annotations
 
+import json
 import logging
+import threading
 from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
 import tensorflow as tf
+from PIL import Image, ImageOps
+
+from backend.config import (
+    MODEL_ARTIFACTS_ROOT,
+    PLANTVILLAGE_DIR,
+    get_settings,
+)
 
 # -----------------------------------------------------
 # Logging
@@ -28,19 +37,44 @@ logger = logging.getLogger(__name__)
 # Paths
 # -----------------------------------------------------
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MODEL_PATH = get_settings().model_path
 
-MODEL_PATH = PROJECT_ROOT / "saved_models" / "plant_disease_cnn.keras"
-
-TRAIN_DIR = (
-    PROJECT_ROOT
-    / "dataset"
-    / "raw"
-    / "PlantVillage"
-    / "train"
-)
+TRAIN_DIR = PLANTVILLAGE_DIR / "train"
 
 IMAGE_SIZE = (256, 256)
+
+CLASS_NAMES_FILE = "class_names.json"
+
+
+def load_class_names(artifacts_dir: Path) -> List[str]:
+    """
+    Load the model's class names in output-index order.
+
+    Prefers the versioned `class_names.json` so the API does not depend
+    on the training dataset being present. Falls back to the sorted
+    training folder names (the order Keras used during training).
+    """
+
+    class_file = artifacts_dir / CLASS_NAMES_FILE
+
+    if class_file.exists():
+        return json.loads(class_file.read_text(encoding="utf-8"))
+
+    if TRAIN_DIR.exists():
+        logger.warning(
+            "%s not found; reading class names from %s",
+            class_file,
+            TRAIN_DIR,
+        )
+        return sorted(
+            folder.name
+            for folder in TRAIN_DIR.iterdir()
+            if folder.is_dir()
+        )
+
+    raise FileNotFoundError(
+        f"Class names not found:\n{class_file}"
+    )
 
 
 class PlantDiseasePredictor:
@@ -48,27 +82,39 @@ class PlantDiseasePredictor:
     Predict plant disease from a single leaf image.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, model_path: Path | None = None) -> None:
+
+        settings = get_settings()
+        model_path = Path(model_path or settings.model_path)
 
         logger.info("Loading model...")
 
-        if not MODEL_PATH.exists():
+        if not model_path.exists():
             raise FileNotFoundError(
-                f"Model not found:\n{MODEL_PATH}"
+                f"Model not found:\n{model_path}"
             )
 
-        self.model = tf.keras.models.load_model(MODEL_PATH)
+        self.model = tf.keras.models.load_model(model_path)
+        self.model_version = model_path.stem
+
+        # (height, width) taken from the model so other architectures
+        # (e.g. 224x224 transfer-learning models) need no code change.
+        height, width = self.model.input_shape[1:3]
+        self.image_size = (int(width or IMAGE_SIZE[0]), int(height or IMAGE_SIZE[1]))
 
         logger.info("Model loaded successfully.")
 
-        # Read class names directly from folder names
-        self.class_names = sorted(
-            [
-                folder.name
-                for folder in TRAIN_DIR.iterdir()
-                if folder.is_dir()
-            ]
-        )
+        self.artifacts_dir = MODEL_ARTIFACTS_ROOT / model_path.stem
+
+        self.class_names = load_class_names(self.artifacts_dir)
+
+        num_outputs = int(self.model.output_shape[-1])
+
+        if num_outputs != len(self.class_names):
+            raise ValueError(
+                f"Model has {num_outputs} outputs but "
+                f"{len(self.class_names)} class names were loaded."
+            )
 
         logger.info(
             "Loaded %d classes.",
@@ -80,7 +126,12 @@ class PlantDiseasePredictor:
         image_path: str,
     ) -> np.ndarray:
         """
-        Resize and normalize image.
+        Load, orient, resize and normalize an image.
+
+        - EXIF orientation is applied so phone photos are upright.
+        - Bilinear resize matches the training pipeline
+          (image_dataset_from_directory); PIL antialiases when
+          downscaling large photos.
         """
 
         image_path = Path(image_path)
@@ -90,20 +141,30 @@ class PlantDiseasePredictor:
                 f"Image not found:\n{image_path}"
             )
 
-        image = tf.keras.utils.load_img(
-            image_path,
-            target_size=IMAGE_SIZE,
-        )
+        with Image.open(image_path) as image:
+            image = ImageOps.exif_transpose(image)
+            image = image.convert("RGB")
+            image = image.resize(self.image_size, Image.Resampling.BILINEAR)
+            array = np.asarray(image, dtype=np.float32)
 
-        image = tf.keras.utils.img_to_array(image)
+        array /= 255.0
 
-        image = image.astype(np.float32)
+        return np.expand_dims(array, axis=0)
 
-        image /= 255.0
+    def predict_probabilities(
+        self,
+        image_path: str,
+    ) -> np.ndarray:
+        """
+        Return the raw softmax vector for one image.
+        """
 
-        image = np.expand_dims(image, axis=0)
+        image = self.preprocess_image(image_path)
 
-        return image
+        return self.model.predict(
+            image,
+            verbose=0,
+        )[0]
 
     def predict(
         self,
@@ -113,12 +174,7 @@ class PlantDiseasePredictor:
         Predict disease.
         """
 
-        image = self.preprocess_image(image_path)
-
-        predictions = self.model.predict(
-            image,
-            verbose=0,
-        )[0]
+        predictions = self.predict_probabilities(image_path)
 
         predicted_index = int(np.argmax(predictions))
 
@@ -147,13 +203,36 @@ class PlantDiseasePredictor:
         )
 
 
+# -----------------------------------------------------
+# Shared Predictor Instance
+# -----------------------------------------------------
+
+_predictor: PlantDiseasePredictor | None = None
+_predictor_lock = threading.Lock()
+
+
+def get_predictor() -> PlantDiseasePredictor:
+    """
+    Return the process-wide predictor, loading the model on first use.
+    """
+
+    global _predictor
+
+    if _predictor is None:
+        with _predictor_lock:
+            if _predictor is None:
+                _predictor = PlantDiseasePredictor()
+
+    return _predictor
+
+
 def main() -> None:
 
     print("\n" + "=" * 60)
     print("Plant Disease Prediction")
     print("=" * 60)
 
-    predictor = PlantDiseasePredictor()
+    predictor = get_predictor()
 
     image_path = input(
         "\nEnter image path:\n> "
@@ -182,14 +261,9 @@ def main() -> None:
     print("=" * 60)
 
 
-if __name__ == "__main__":
-    main()
-
 # -----------------------------------------------------
 # Reusable Prediction Function
 # -----------------------------------------------------
-
-_predictor = PlantDiseasePredictor()
 
 
 def predict_image(image_path: str) -> dict:
@@ -198,7 +272,7 @@ def predict_image(image_path: str) -> dict:
     the result as a dictionary for the Flask API.
     """
 
-    predicted_class, confidence, top3 = _predictor.predict(image_path)
+    predicted_class, confidence, top3 = get_predictor().predict(image_path)
 
     return {
         "predicted_class": predicted_class,
@@ -211,3 +285,7 @@ def predict_image(image_path: str) -> dict:
             for name, score in top3
         ],
     }
+
+
+if __name__ == "__main__":
+    main()
