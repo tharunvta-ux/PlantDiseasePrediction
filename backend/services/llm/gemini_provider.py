@@ -16,6 +16,7 @@ from google.genai import errors, types
 from backend.services.llm.base import (
     LLMInvalidResponseError,
     LLMNotConfiguredError,
+    LLMResponse,
     LLMTimeoutError,
     LLMUnavailableError,
     LLMUpstreamError,
@@ -28,6 +29,9 @@ logger = logging.getLogger(__name__)
 RETRY_ATTEMPTS = 2
 
 MAX_OUTPUT_TOKENS = 2048
+
+# Overloaded / rate-limited: worth trying the fallback model.
+FALLBACK_STATUSES = frozenset({429, 503})
 
 
 class GeminiProvider:
@@ -42,16 +46,22 @@ class GeminiProvider:
         timeout_seconds: float,
         temperature: float,
         base_url: str | None = None,
+        fallback_model: str | None = None,
     ) -> None:
         """
         Args:
             base_url: Optional API endpoint override (proxies, tests).
+            fallback_model: Model tried once when the primary model is
+                overloaded or rate-limited (HTTP 503 / 429).
         """
 
         if not api_key:
             raise LLMNotConfiguredError("Gemini API key is missing.")
 
         self.model = model
+        self.fallback_model = (
+            fallback_model if fallback_model and fallback_model != model else None
+        )
         self.temperature = temperature
 
         self._client = genai.Client(
@@ -68,8 +78,11 @@ class GeminiProvider:
         system_prompt: str,
         user_prompt: str,
         response_schema: Dict[str, Any],
-    ) -> str:
-        """Generate JSON text; map SDK/network errors to LLMError."""
+    ) -> LLMResponse:
+        """
+        Generate JSON text, falling back to `fallback_model` once if the
+        primary model is overloaded or rate-limited.
+        """
 
         config = types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -77,11 +90,39 @@ class GeminiProvider:
             max_output_tokens=MAX_OUTPUT_TOKENS,
             response_mime_type="application/json",
             response_json_schema=response_schema,
+            # No tools are used; disabling AFC also silences SDK warnings.
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                disable=True
+            ),
         )
 
         try:
+            return self._generate(self.model, user_prompt, config)
+
+        except LLMUpstreamError as exc:
+            if not self.fallback_model or exc.status not in FALLBACK_STATUSES:
+                raise
+
+            logger.warning(
+                "Model %s unavailable (%s); falling back to %s",
+                self.model,
+                exc.status,
+                self.fallback_model,
+            )
+
+            return self._generate(self.fallback_model, user_prompt, config)
+
+    def _generate(
+        self,
+        model: str,
+        user_prompt: str,
+        config: types.GenerateContentConfig,
+    ) -> LLMResponse:
+        """One generate_content call with error mapping."""
+
+        try:
             response = self._client.models.generate_content(
-                model=self.model,
+                model=model,
                 contents=user_prompt,
                 config=config,
             )
@@ -114,7 +155,7 @@ class GeminiProvider:
                 f"Empty response from Gemini (finish_reason={finish})."
             )
 
-        return text
+        return LLMResponse(text=text, model=model)
 
 
 def _map_api_error(exc: errors.APIError) -> LLMUpstreamError:
@@ -122,45 +163,43 @@ def _map_api_error(exc: errors.APIError) -> LLMUpstreamError:
 
     status = exc.code or 0
 
+    def error(code: str | None = None, message: str | None = None) -> LLMUpstreamError:
+        return LLMUpstreamError(str(exc), code=code, public_message=message, status=status)
+
     if status in (401, 403) or (status == 400 and "API key" in str(exc.message)):
-        return LLMUpstreamError(
-            str(exc),
-            code="LLM_AUTH_FAILED",
-            public_message=(
-                "The treatment guidance service rejected the server's API "
-                "key. The administrator needs to check LLM_API_KEY."
-            ),
+        return error(
+            "LLM_AUTH_FAILED",
+            "The treatment guidance service rejected the server's API "
+            "key. The administrator needs to check LLM_API_KEY.",
         )
 
     if status == 402:
-        return LLMUpstreamError(
-            str(exc),
-            code="LLM_BILLING",
-            public_message=(
-                "The treatment guidance service is unavailable: the LLM "
-                "account has no remaining credit. The administrator needs "
-                "to check billing in Google AI Studio."
-            ),
+        return error(
+            "LLM_BILLING",
+            "The treatment guidance service is unavailable: the LLM "
+            "account has no remaining credit. The administrator needs "
+            "to check billing in Google AI Studio.",
         )
 
     if status == 404:
-        return LLMUpstreamError(
-            str(exc),
-            code="LLM_MODEL_NOT_FOUND",
-            public_message=(
-                "The configured LLM model is not available. The "
-                "administrator needs to check LLM_MODEL."
-            ),
+        return error(
+            "LLM_MODEL_NOT_FOUND",
+            "The configured LLM model is not available. The "
+            "administrator needs to check LLM_MODEL.",
         )
 
     if status == 429:
-        return LLMUpstreamError(
-            str(exc),
-            code="LLM_RATE_LIMITED",
-            public_message=(
-                "The treatment guidance service is busy (rate limit "
-                "reached). Please try again in a minute."
-            ),
+        return error(
+            "LLM_RATE_LIMITED",
+            "The treatment guidance service is busy (rate limit "
+            "reached). Please try again in a minute.",
         )
 
-    return LLMUpstreamError(str(exc))
+    if status == 503:
+        return error(
+            "LLM_BUSY",
+            "The treatment guidance service is temporarily overloaded. "
+            "Please try again in a minute.",
+        )
+
+    return error()

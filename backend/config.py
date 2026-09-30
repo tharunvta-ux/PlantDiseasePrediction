@@ -49,6 +49,10 @@ ALLOWED_EXTENSIONS = frozenset({"jpg", "jpeg", "png"})
 # /pricing on 2026-09-30: stable model with a free API tier.
 DEFAULT_LLM_MODEL = "gemini-3.8-flash"
 
+# Used once when the primary model is overloaded (503) or rate-limited
+# (429). Also free tier; set LLM_FALLBACK_MODEL= (empty) to disable.
+DEFAULT_LLM_FALLBACK_MODEL = "gemini-3.5-flash-lite"
+
 
 def _env_float(name: str, default: float) -> float:
     """Read a float environment variable, falling back on bad input."""
@@ -72,6 +76,7 @@ class Settings:
     llm_provider: str
     llm_api_key: str | None
     llm_model: str
+    llm_fallback_model: str | None
     llm_timeout_seconds: float
     llm_temperature: float
 
@@ -113,6 +118,9 @@ def get_settings() -> Settings:
         llm_provider=os.getenv("LLM_PROVIDER", "gemini").strip().lower(),
         llm_api_key=api_key.strip() if api_key else None,
         llm_model=os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL).strip(),
+        llm_fallback_model=(
+            os.getenv("LLM_FALLBACK_MODEL", DEFAULT_LLM_FALLBACK_MODEL).strip() or None
+        ),
         llm_timeout_seconds=_env_float("LLM_TIMEOUT_SECONDS", 30.0),
         llm_temperature=_env_float("LLM_TEMPERATURE", 0.2),
     )

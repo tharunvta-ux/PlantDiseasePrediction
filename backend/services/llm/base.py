@@ -9,7 +9,16 @@ return consistent JSON errors without knowing the provider.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Dict, Protocol
+
+
+@dataclass(frozen=True)
+class LLMResponse:
+    """Raw provider output plus the model that actually produced it."""
+
+    text: str
+    model: str
 
 
 class LLMError(Exception):
@@ -65,8 +74,10 @@ class LLMUpstreamError(LLMError):
         detail: str = "",
         code: str | None = None,
         public_message: str | None = None,
+        status: int | None = None,
     ) -> None:
         super().__init__(detail)
+        self.status = status  # provider HTTP status, if known
         if code:
             self.code = code
         if public_message:
@@ -95,12 +106,12 @@ class LLMProvider(Protocol):
         system_prompt: str,
         user_prompt: str,
         response_schema: Dict[str, Any],
-    ) -> str:
+    ) -> LLMResponse:
         """
         Generate a JSON document conforming to `response_schema`.
 
         Returns:
-            The raw JSON text (validated by the caller).
+            The raw JSON text (validated by the caller) and the model used.
 
         Raises:
             LLMError subclasses on any failure.

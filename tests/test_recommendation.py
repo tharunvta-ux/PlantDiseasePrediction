@@ -12,6 +12,7 @@ import pytest
 
 import backend.services.recommendation_service as rec
 from backend.services.llm import (
+    LLMResponse,
     LLMTimeoutError,
     LLMUnavailableError,
     LLMUpstreamError,
@@ -45,7 +46,7 @@ class FakeProvider:
         self.calls.append((system_prompt, user_prompt, response_schema))
         if self.error:
             raise self.error
-        return self.reply
+        return LLMResponse(text=self.reply, model=self.model)
 
 
 @pytest.fixture()

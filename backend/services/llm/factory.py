@@ -35,6 +35,7 @@ def get_llm_provider(settings: Settings | None = None) -> LLMProvider:
         settings.llm_provider,
         settings.llm_api_key,
         settings.llm_model,
+        settings.llm_fallback_model,
         settings.llm_timeout_seconds,
         settings.llm_temperature,
     )
@@ -49,6 +50,7 @@ def get_llm_provider(settings: Settings | None = None) -> LLMProvider:
             _provider = GeminiProvider(
                 api_key=settings.llm_api_key,
                 model=settings.llm_model,
+                fallback_model=settings.llm_fallback_model,
                 timeout_seconds=settings.llm_timeout_seconds,
                 temperature=settings.llm_temperature,
             )

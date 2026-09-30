@@ -99,11 +99,11 @@ def _stub(provider, fn):
         (404, "LLM_MODEL_NOT_FOUND"),
         (429, "LLM_RATE_LIMITED"),
         (500, "LLM_UPSTREAM_ERROR"),
-        (503, "LLM_UPSTREAM_ERROR"),
+        (503, "LLM_BUSY"),
     ],
 )
 def test_api_errors_are_mapped(status, code):
-    provider = make_provider()
+    provider = make_provider()  # no fallback configured
 
     def fail(**_kwargs):
         raise errors.APIError(status, {"error": {"message": "boom", "status": "X"}})
@@ -134,12 +134,66 @@ def test_request_uses_json_schema_and_system_prompt():
 
     _stub(provider, capture)
 
-    assert provider.generate_json("SYSTEM", "USER", SCHEMA) == '{"a": "b"}'
+    response = provider.generate_json("SYSTEM", "USER", SCHEMA)
+
+    assert response.text == '{"a": "b"}'
+    assert response.model == "gemini-test"
     assert seen["model"] == "gemini-test"
     assert seen["contents"] == "USER"
     assert seen["config"].system_instruction == "SYSTEM"
     assert seen["config"].response_mime_type == "application/json"
     assert seen["config"].response_json_schema == SCHEMA
+
+
+# ---------------- fallback model ----------------
+
+
+def _failing_primary(status, calls):
+    def generate(**kwargs):
+        calls.append(kwargs["model"])
+        if kwargs["model"] == "gemini-test":
+            raise errors.APIError(status, {"error": {"message": "busy", "status": "X"}})
+        return SimpleNamespace(text='{"a": "b"}')
+
+    return generate
+
+
+@pytest.mark.parametrize("status", [503, 429])
+def test_falls_back_when_primary_overloaded(status):
+    provider = make_provider(fallback_model="gemini-fallback")
+    calls = []
+    _stub(provider, _failing_primary(status, calls))
+
+    response = provider.generate_json("s", "u", SCHEMA)
+
+    assert calls == ["gemini-test", "gemini-fallback"]
+    assert response.model == "gemini-fallback"
+
+
+@pytest.mark.parametrize("status", [400, 401, 402, 404, 500])
+def test_no_fallback_for_other_errors(status):
+    provider = make_provider(fallback_model="gemini-fallback")
+    calls = []
+    _stub(provider, _failing_primary(status, calls))
+
+    with pytest.raises(LLMUpstreamError):
+        provider.generate_json("s", "u", SCHEMA)
+
+    assert calls == ["gemini-test"]
+
+
+def test_fallback_failure_is_reported():
+    provider = make_provider(fallback_model="gemini-fallback")
+
+    def always_busy(**_kwargs):
+        raise errors.APIError(503, {"error": {"message": "busy", "status": "X"}})
+
+    _stub(provider, always_busy)
+
+    with pytest.raises(LLMUpstreamError) as info:
+        provider.generate_json("s", "u", SCHEMA)
+
+    assert info.value.code == "LLM_BUSY"
 
 
 # ---------------- live (opt-in) ----------------
@@ -158,6 +212,7 @@ def test_live_gemini_recommendation():
     provider = GeminiProvider(
         api_key=settings.llm_api_key,
         model=settings.llm_model,
+        fallback_model=settings.llm_fallback_model,
         timeout_seconds=settings.llm_timeout_seconds,
         temperature=settings.llm_temperature,
     )

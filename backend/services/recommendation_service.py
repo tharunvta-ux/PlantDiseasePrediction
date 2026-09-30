@@ -352,14 +352,14 @@ def generate_recommendation(
         logger.info("Recommendation cache hit for %s (%s)", predicted_class, level)
         return {**cached, "cached": True}
 
-    raw = provider.generate_json(
+    response = provider.generate_json(
         SYSTEM_PROMPT,
         build_user_prompt(predicted_class, level, alternatives),
         RESPONSE_SCHEMA,
     )
 
     try:
-        guidance = TreatmentGuidance.model_validate_json(raw)
+        guidance = TreatmentGuidance.model_validate_json(response.text)
     except ValidationError as exc:
         logger.warning("LLM output failed validation: %s", exc)
         raise LLMInvalidResponseError(str(exc)) from exc
@@ -393,7 +393,7 @@ def generate_recommendation(
             ),
         },
         "safety": {"redacted_items": removed},
-        "generated_by": {"provider": provider.name, "model": provider.model},
+        "generated_by": {"provider": provider.name, "model": response.model},
         "disclaimer": DISCLAIMER,
     }
 
