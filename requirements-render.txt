@@ -1,0 +1,13 @@
+# Runtime dependencies for the Render web service (no TensorFlow:
+# the model is served as TFLite via ai-edge-litert to fit in 512 MB RAM).
+# Training / evaluation still use requirements.txt.
+ai-edge-litert==2.2.0
+Flask==3.1.3
+google-genai==2.25.0
+gunicorn==26.2.0
+httpx==0.28.1
+numpy==2.5.1
+opencv-python-headless==5.0.0.93
+pillow==12.3.0
+pydantic==2.13.5
+python-dotenv==1.2.3

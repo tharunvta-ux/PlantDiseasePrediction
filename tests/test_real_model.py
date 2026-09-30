@@ -20,7 +20,9 @@ from tests.conftest import CLASS_NAMES, FIXTURES_DIR, first_val_image
 
 pytestmark = pytest.mark.model
 
-PREDICTIONS_FILE = PROJECT_ROOT / "results" / "calibration" / "val_predictions.npz"
+PREDICTIONS_FILE = (
+    PROJECT_ROOT / "results" / "calibration" / "plant_disease_cnn" / "val_predictions.npz"
+)
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 

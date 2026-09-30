@@ -1,0 +1,17 @@
+{
+  "model_version": "plant_disease_cnn_int8",
+  "created": "2026-09-30",
+  "temperature": 1.0426164294541693,
+  "provisional": true,
+  "provisional_reason": "Derived from PlantVillage validation images only (lab photos, plain backgrounds). No labelled real-world images were available; real-world accuracy at these thresholds is unmeasured.",
+  "quality_reference": {
+    "blur_score_p01": 35.77525398275815,
+    "brightness_p01": 77.92179992675781,
+    "brightness_p99": 171.98048400878906,
+    "contrast_p01": 16.860815710495284
+  },
+  "thresholds": {
+    "high": 0.9404555424456548,
+    "low": 0.5449417635360851
+  }
+}

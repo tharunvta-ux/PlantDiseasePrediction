@@ -42,8 +42,11 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy.optimize import minimize_scalar  # noqa: E402
 
-from backend.config import MODEL_ARTIFACTS_ROOT, PROJECT_ROOT  # noqa: E402
-from backend.evaluation.collect_predictions import DEFAULT_OUTPUT  # noqa: E402
+from backend.config import MODEL_ARTIFACTS_ROOT, PROJECT_ROOT, get_settings  # noqa: E402
+from backend.evaluation.collect_predictions import (  # noqa: E402
+    CALIBRATION_RESULTS_DIR,
+    default_output,
+)
 from backend.prediction.confidence import (  # noqa: E402
     CALIBRATION_FILE,
     apply_temperature,
@@ -54,7 +57,6 @@ logger = logging.getLogger(__name__)
 SEED = 42
 ECE_BINS = 15
 MIN_SAMPLES_FOR_LOW_THRESHOLD = 20
-REPORT_DIR = PROJECT_ROOT / "results" / "calibration"
 
 
 # ==========================================================
@@ -412,13 +414,14 @@ def calibrate(predictions_file: Path) -> Dict[str, Any]:
         },
     }
 
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    report_dir = CALIBRATION_RESULTS_DIR / model_version
+    report_dir.mkdir(parents=True, exist_ok=True)
 
-    (REPORT_DIR / "calibration_report.json").write_text(
+    (report_dir / "calibration_report.json").write_text(
         json.dumps(report, indent=2), encoding="utf-8"
     )
 
-    save_plots(raw_conf[test_idx], t_conf, t_correct, high, low, REPORT_DIR)
+    save_plots(raw_conf[test_idx], t_conf, t_correct, high, low, report_dir)
 
     # Runtime config consumed by the API (subset of the report).
     runtime = {
@@ -449,7 +452,12 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--predictions", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--predictions",
+        type=Path,
+        default=default_output(get_settings().model_version),
+        help="Default: predictions of the model configured by MODEL_PATH.",
+    )
     args = parser.parse_args()
 
     report = calibrate(args.predictions)

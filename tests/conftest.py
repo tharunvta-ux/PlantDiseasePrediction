@@ -21,6 +21,10 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 from backend.config import MODEL_ARTIFACTS_ROOT, PLANTVILLAGE_DIR, get_settings  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+# Tests use the original model unless they set MODEL_PATH themselves.
+os.environ.pop("MODEL_PATH", None)
+
 FIXTURES_DIR = PROJECT_ROOT / "tests" / "fixtures"
 ARTIFACTS_DIR = MODEL_ARTIFACTS_ROOT / "plant_disease_cnn"
 CLASS_NAMES: List[str] = json.loads(

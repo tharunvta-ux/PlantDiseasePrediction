@@ -1,0 +1,116 @@
+{
+  "model_version": "plant_disease_cnn",
+  "created": "2026-09-30",
+  "data": {
+    "source": "results\\calibration\\plant_disease_cnn\\val_predictions.npz",
+    "calibration_images": 5422,
+    "test_images": 5439,
+    "split": "stratified 50/50 of PlantVillage val, seed 42",
+    "caveat": "The PlantVillage val split was also used for early stopping, so these numbers are optimistic."
+  },
+  "temperature": 1.0414146157065631,
+  "thresholds": {
+    "high": 0.933721688195867,
+    "low": 0.5615107577177539,
+    "method_high": "max Youden's J (correct vs incorrect) on calibration half",
+    "method_low": "largest t with accuracy(conf < t) <= 50% on calibration half",
+    "low_details": {
+      "value": 0.5615107577177539,
+      "samples_below": 346,
+      "accuracy_below": 0.5
+    }
+  },
+  "provisional": true,
+  "provisional_reason": "Derived from PlantVillage validation images only (lab photos, plain backgrounds). No labelled real-world images were available; real-world accuracy at these thresholds is unmeasured.",
+  "quality_reference": {
+    "blur_score_p01": 35.77525398275815,
+    "brightness_p01": 77.92179992675781,
+    "brightness_p99": 171.98048400878906,
+    "contrast_p01": 16.860815710495284
+  },
+  "test_metrics": {
+    "accuracy": 0.9301,
+    "macro_class_accuracy": 0.9139,
+    "nll_raw": 0.2234,
+    "nll_calibrated": 0.2237,
+    "ece_raw": 0.0126,
+    "ece_calibrated": 0.0153,
+    "levels": {
+      "high": {
+        "count": 4043,
+        "coverage": 0.7433,
+        "accuracy": 0.9896,
+        "accuracy_95ci": [
+          0.986,
+          0.9923
+        ]
+      },
+      "uncertain": {
+        "count": 1086,
+        "coverage": 0.1997,
+        "accuracy": 0.826,
+        "accuracy_95ci": [
+          0.8023,
+          0.8474
+        ]
+      },
+      "low": {
+        "count": 310,
+        "coverage": 0.057,
+        "accuracy": 0.5194,
+        "accuracy_95ci": [
+          0.4638,
+          0.5744
+        ]
+      }
+    },
+    "quality_flags": {
+      "flagged_fraction": 0.0432,
+      "accuracy_flagged": 0.9404,
+      "accuracy_unflagged": 0.9297,
+      "high_coverage_without_quality_cap": 0.7433,
+      "high_coverage_with_quality_cap": 0.7049,
+      "high_accuracy_with_quality_cap": 0.9901
+    },
+    "per_class_accuracy": {
+      "Apple___Apple_scab": 0.8413,
+      "Apple___Black_rot": 0.9683,
+      "Apple___Cedar_apple_rust": 0.9643,
+      "Apple___healthy": 0.9879,
+      "Blueberry___healthy": 0.94,
+      "Cherry_(including_sour)___Powdery_mildew": 0.9524,
+      "Cherry_(including_sour)___healthy": 0.9882,
+      "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot": 0.5962,
+      "Corn_(maize)___Common_rust_": 1.0,
+      "Corn_(maize)___Northern_Leaf_Blight": 0.8687,
+      "Corn_(maize)___healthy": 0.906,
+      "Grape___Black_rot": 0.9153,
+      "Grape___Esca_(Black_Measles)": 0.9565,
+      "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)": 1.0,
+      "Grape___healthy": 0.9524,
+      "Orange___Haunglongbing_(Citrus_greening)": 0.9946,
+      "Peach___Bacterial_spot": 0.9652,
+      "Peach___healthy": 0.9444,
+      "Pepper,_bell___Bacterial_spot": 0.84,
+      "Pepper,_bell___healthy": 0.9122,
+      "Potato___Early_blight": 0.98,
+      "Potato___Late_blight": 0.9,
+      "Potato___healthy": 0.875,
+      "Raspberry___healthy": 0.9189,
+      "Soybean___healthy": 0.9823,
+      "Squash___Powdery_mildew": 0.9728,
+      "Strawberry___Leaf_scorch": 0.964,
+      "Strawberry___healthy": 1.0,
+      "Tomato___Bacterial_spot": 0.9671,
+      "Tomato___Early_blight": 0.74,
+      "Tomato___Late_blight": 0.7696,
+      "Tomato___Leaf_Mold": 0.8542,
+      "Tomato___Septoria_leaf_spot": 0.8588,
+      "Tomato___Spider_mites Two-spotted_spider_mite": 0.8512,
+      "Tomato___Target_Spot": 0.6667,
+      "Tomato___Tomato_Yellow_Leaf_Curl_Virus": 0.9608,
+      "Tomato___Tomato_mosaic_virus": 0.973,
+      "Tomato___healthy": 1.0
+    }
+  }
+}

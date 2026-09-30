@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
-import tensorflow as tf
 from PIL import Image, ImageOps
 
 from backend.config import (
@@ -21,6 +20,7 @@ from backend.config import (
     PLANTVILLAGE_DIR,
     get_settings,
 )
+from backend.prediction.model_backends import load_backend
 
 # -----------------------------------------------------
 # Logging
@@ -94,13 +94,13 @@ class PlantDiseasePredictor:
                 f"Model not found:\n{model_path}"
             )
 
-        self.model = tf.keras.models.load_model(model_path)
+        # .keras -> TensorFlow, .tflite -> lightweight LiteRT runtime.
+        self.backend = load_backend(model_path, IMAGE_SIZE)
         self.model_version = model_path.stem
 
-        # (height, width) taken from the model so other architectures
+        # Input size comes from the model so other architectures
         # (e.g. 224x224 transfer-learning models) need no code change.
-        height, width = self.model.input_shape[1:3]
-        self.image_size = (int(width or IMAGE_SIZE[0]), int(height or IMAGE_SIZE[1]))
+        self.image_size = self.backend.input_size
 
         logger.info("Model loaded successfully.")
 
@@ -108,7 +108,7 @@ class PlantDiseasePredictor:
 
         self.class_names = load_class_names(self.artifacts_dir)
 
-        num_outputs = int(self.model.output_shape[-1])
+        num_outputs = self.backend.num_classes
 
         if num_outputs != len(self.class_names):
             raise ValueError(
@@ -161,10 +161,17 @@ class PlantDiseasePredictor:
 
         image = self.preprocess_image(image_path)
 
-        return self.model.predict(
-            image,
-            verbose=0,
-        )[0]
+        return self.predict_batch(image)[0]
+
+    def predict_batch(
+        self,
+        images: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Softmax outputs for a preprocessed [N, H, W, 3] batch.
+        """
+
+        return self.backend.predict_batch(images)
 
     def predict(
         self,

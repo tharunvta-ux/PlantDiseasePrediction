@@ -31,8 +31,10 @@ dataset/
 # ===============================
 logs/
 uploads/
-saved_models/
-results/calibration/*.npz
+saved_models/*
+# The small TFLite model is committed so Render can deploy it.
+!saved_models/plant_disease_cnn_int8.tflite
+results/calibration/**/*.npz
 
 # ===============================
 # ML Model Files

@@ -8,6 +8,8 @@ softmax outputs plus image-quality metrics for calibration/evaluation.
 Also exports the model's class names to
 backend/model_artifacts/<model>/class_names.json.
 
+The model is the one configured by MODEL_PATH (default: the .keras CNN).
+
 Usage:
     python -m backend.evaluation.collect_predictions [--data-dir DIR]
 """
@@ -34,7 +36,15 @@ logger = logging.getLogger(__name__)
 
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
-DEFAULT_OUTPUT = PROJECT_ROOT / "results" / "calibration" / "val_predictions.npz"
+CALIBRATION_RESULTS_DIR = PROJECT_ROOT / "results" / "calibration"
+
+PREDICTIONS_FILE = "val_predictions.npz"
+
+
+def default_output(model_version: str) -> Path:
+    """results/calibration/<model_version>/val_predictions.npz"""
+
+    return CALIBRATION_RESULTS_DIR / model_version / PREDICTIONS_FILE
 
 BATCH_SIZE = 64
 
@@ -91,10 +101,11 @@ def export_class_names(predictor: PlantDiseasePredictor) -> Path:
     return target
 
 
-def collect(data_dir: Path, output: Path) -> None:
+def collect(data_dir: Path, output: Path | None) -> None:
     """Predict every image in data_dir and save the results."""
 
     predictor = PlantDiseasePredictor()
+    output = output or default_output(predictor.model_version)
 
     class_file = export_class_names(predictor)
     logger.info("Class names written to %s", class_file)
@@ -118,7 +129,7 @@ def collect(data_dir: Path, output: Path) -> None:
         )
 
         probabilities[begin:begin + len(batch_paths)] = (
-            predictor.model.predict(batch, verbose=0)
+            predictor.predict_batch(batch)
         )
 
         for offset, path in enumerate(batch_paths):
@@ -176,7 +187,12 @@ def main() -> None:
         type=Path,
         default=PLANTVILLAGE_DIR / "val",
     )
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Default: results/calibration/<model>/val_predictions.npz",
+    )
     args = parser.parse_args()
 
     collect(args.data_dir, args.output)
