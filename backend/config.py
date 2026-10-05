@@ -84,6 +84,7 @@ class Settings:
     llm_fallback_model: str | None
     tts_model: str | None
     tts_fallback_model: str | None
+    tts_timeout_seconds: float
     llm_timeout_seconds: float
     llm_temperature: float
 
@@ -132,6 +133,7 @@ def get_settings() -> Settings:
         tts_fallback_model=(
             os.getenv("LLM_TTS_FALLBACK_MODEL", DEFAULT_TTS_FALLBACK_MODEL).strip() or None
         ),
+        tts_timeout_seconds=_env_float("LLM_TTS_TIMEOUT_SECONDS", 60.0),
         llm_timeout_seconds=_env_float("LLM_TIMEOUT_SECONDS", 30.0),
         llm_temperature=_env_float("LLM_TEMPERATURE", 0.2),
     )

@@ -81,14 +81,51 @@ def test_speech_text_has_no_headings_and_all_sections():
     assert GOOD_GUIDANCE["uncertainty_note"] not in text  # only for uncertain results
 
 
+def test_split_for_speech_respects_limit_and_sentences():
+    text = ". ".join(f"Sentence number {i} with some words" for i in range(40)) + "."
+    parts = speech.split_for_speech(text, max_chars=200)
+
+    assert len(parts) > 1
+    assert all(len(p) <= 200 for p in parts)
+    assert all(p.endswith(".") for p in parts)
+    assert " ".join(parts).count("Sentence number") == 40
+
+
+def test_split_keeps_overlong_sentence_whole():
+    assert speech.split_for_speech("x" * 500 + ".", max_chars=100) == ["x" * 500 + "."]
+
+
 def test_speech_endpoint_returns_wav(client, fake_predictor, provider):
     response = client.post("/speech", json=BODY)
 
     assert response.status_code == 200
     assert response.mimetype == "audio/wav"
     assert response.headers["X-TTS-Model"] == "fake-tts"
+    assert response.headers["X-Speech-Part"] == "0"
+    assert int(response.headers["X-Speech-Parts"]) >= 1
     assert response.data[:4] == b"RIFF"
     assert provider.speech_calls[0][1] == "ta-IN"
+
+
+def test_speech_parts_cover_all_guidance(client, fake_predictor, provider, monkeypatch):
+    original_split = speech.split_for_speech
+    monkeypatch.setattr(speech, "split_for_speech", lambda text: original_split(text, max_chars=120))
+
+    first = client.post("/speech", json=BODY)
+    total = int(first.headers["X-Speech-Parts"])
+    assert total > 1
+
+    for part in range(1, total):
+        assert client.post("/speech", json={**BODY, "part": part}).status_code == 200
+
+    spoken = " ".join(text for text, _ in provider.speech_calls)
+    assert "Remove and bag infected leaves" in spoken
+    assert len(provider.speech_calls) == total
+
+
+@pytest.mark.parametrize("part", [99, -1, "1", True])
+def test_speech_invalid_part(client, fake_predictor, provider, part):
+    assert client.post("/speech", json={**BODY, "part": part}).status_code == 400
 
 
 def test_speech_is_cached(client, fake_predictor, provider):
@@ -153,7 +190,7 @@ def test_gemini_tts_request_and_fallback():
             raise errors.APIError(503, {"error": {"message": "busy", "status": "UNAVAILABLE"}})
         return _audio_response()
 
-    provider._client = SimpleNamespace(models=SimpleNamespace(generate_content=generate))
+    provider._tts_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate))
     audio = provider.synthesize_speech("வணக்கம்", "ta-IN")
 
     assert [c["model"] for c in calls] == ["tts-a", "tts-b"]
@@ -167,7 +204,7 @@ def test_gemini_tts_empty_audio_is_invalid():
     from backend.services.llm import LLMInvalidResponseError
 
     provider = make_provider(tts_model="tts-a")
-    provider._client = SimpleNamespace(models=SimpleNamespace(generate_content=lambda **_: _audio_response(b"")))
+    provider._tts_client = SimpleNamespace(models=SimpleNamespace(generate_content=lambda **_: _audio_response(b"")))
 
     with pytest.raises(LLMInvalidResponseError):
         provider.synthesize_speech("x", "ta-IN")

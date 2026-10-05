@@ -83,6 +83,7 @@ class GeminiProvider:
         fallback_model: str | None = None,
         tts_model: str | None = None,
         tts_fallback_model: str | None = None,
+        tts_timeout_seconds: float = 60.0,
     ) -> None:
         """
         Args:
@@ -111,6 +112,17 @@ class GeminiProvider:
                 base_url=base_url,
                 timeout=int(timeout_seconds * 1000),
                 retry_options=types.HttpRetryOptions(attempts=RETRY_ATTEMPTS),
+            ),
+        )
+
+        # Speech responses are large audio payloads: own, longer timeout
+        # and a single attempt (a retry would double the user's wait).
+        self._tts_client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                base_url=base_url,
+                timeout=int(tts_timeout_seconds * 1000),
+                retry_options=types.HttpRetryOptions(attempts=1),
             ),
         )
 
@@ -209,7 +221,7 @@ class GeminiProvider:
     ) -> SpeechAudio:
         """One TTS call; returns WAV bytes."""
 
-        response = self._request(model, text, config)
+        response = self._request(model, text, config, client=self._tts_client)
 
         try:
             part = response.candidates[0].content.parts[0].inline_data
@@ -222,11 +234,19 @@ class GeminiProvider:
 
         return SpeechAudio(wav=as_wav(data), model=model)
 
-    def _request(self, model: str, contents: Any, config: types.GenerateContentConfig) -> Any:
+    def _request(
+        self,
+        model: str,
+        contents: Any,
+        config: types.GenerateContentConfig,
+        client: Any = None,
+    ) -> Any:
         """generate_content with network / API error mapping."""
 
+        client = client or self._client
+
         try:
-            return self._client.models.generate_content(
+            return client.models.generate_content(
                 model=model,
                 contents=contents,
                 config=config,

@@ -490,8 +490,10 @@
    */
 
   const speech = "speechSynthesis" in window ? window.speechSynthesis : null;
-  let speechAudio = null; // HTMLAudioElement for server audio
-  let speechAudioUrl = null; // object URL, reused while the guidance is unchanged
+  const speechAudio = new Audio(); // plays the server audio parts in order
+  let speechParts = []; // per part: Promise<object URL>, reused while the guidance is unchanged
+  let speechPartCount = null;
+  let speechSession = 0; // bumps on stop / new guidance to cancel stale playback
   let speechController = null;
 
   function setSpeakState(state) {
@@ -502,18 +504,19 @@
   }
 
   function stopSpeaking() {
+    speechSession += 1;
     if (speech) speech.cancel();
-    if (speechAudio) speechAudio.pause();
-    if (speechController) speechController.abort();
-    speechController = null;
+    speechAudio.pause();
     setSpeakState("idle");
   }
 
   function discardSpeechAudio() {
     stopSpeaking();
-    if (speechAudioUrl) URL.revokeObjectURL(speechAudioUrl);
-    speechAudioUrl = null;
-    speechAudio = null;
+    if (speechController) speechController.abort();
+    speechController = null;
+    speechParts.forEach((p) => p.then((url) => URL.revokeObjectURL(url)).catch(() => {}));
+    speechParts = [];
+    speechPartCount = null;
   }
 
   function guidanceSentences(result) {
@@ -547,36 +550,17 @@
     setSpeakState("playing");
   }
 
-  function playAudio() {
-    speechAudio.currentTime = 0;
-    speechAudio.play().then(() => setSpeakState("playing")).catch(() => {
-      setSpeakState("idle");
-      speakNote.textContent = "The browser blocked audio playback. Press Read aloud again.";
-      speakNote.classList.remove("hidden");
-    });
-  }
+  function fetchSpeechPart(index) {
+    if (speechParts[index]) return speechParts[index];
 
-  async function speakWithServer(langTag) {
-    if (speechAudio) {
-      playAudio();
-      return;
-    }
+    if (!speechController) speechController = new AbortController();
 
-    setSpeakState("loading");
-    speakNote.textContent = "Generating audio — this can take 10–20 seconds the first time.";
-    speakNote.classList.remove("hidden");
-
-    const controller = new AbortController();
-    speechController = controller;
-
-    try {
-      const response = await fetch("/speech", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...lastPrediction, language: lastGuidance.language || currentLanguage() }),
-        signal: controller.signal,
-      });
-
+    const promise = fetch("/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...lastPrediction, language: lastGuidance.language || currentLanguage(), part: index }),
+      signal: speechController.signal,
+    }).then(async (response) => {
       if (!response.ok) {
         let message = "Could not create the audio.";
         try {
@@ -586,29 +570,77 @@
         }
         throw new Error(message);
       }
+      speechPartCount = Number(response.headers.get("X-Speech-Parts")) || 1;
+      return URL.createObjectURL(await response.blob());
+    });
 
-      const blob = await response.blob();
-      if (controller !== speechController) return;
+    // A failed part can be retried on the next press.
+    promise.catch(() => { if (speechParts[index] === promise) speechParts[index] = undefined; });
+    speechParts[index] = promise;
+    return promise;
+  }
 
-      speechAudioUrl = URL.createObjectURL(blob);
-      speechAudio = new Audio(speechAudioUrl);
-      speechAudio.onended = () => setSpeakState("idle");
+  async function playSpeechPart(index, session) {
+    if (session !== speechSession) return;
+
+    if (speechPartCount !== null && index >= speechPartCount) {
+      setSpeakState("idle"); // finished
+      return;
+    }
+
+    const url = await fetchSpeechPart(index);
+    if (session !== speechSession) return;
+
+    // Fetch the next part while this one plays.
+    if (speechPartCount !== null && index + 1 < speechPartCount) {
+      fetchSpeechPart(index + 1).catch(() => {});
+    }
+
+    speechAudio.src = url;
+    speechAudio.onended = () => {
+      if (session !== speechSession) return;
+      playSpeechPart(index + 1, session).catch((err) => speechFailed(err, session, true));
+    };
+
+    await speechAudio.play();
+    if (session === speechSession) {
       speakNote.classList.add("hidden");
-      speechController = null;
-      playAudio();
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      speechController = null;
+      setSpeakState("playing");
+    }
+  }
 
-      const voice = deviceVoice(langTag);
+  function speechFailed(err, session, midway) {
+    if (session !== speechSession || (err && err.name === "AbortError")) return;
+    setSpeakState("idle");
+
+    if (err && err.name === "NotAllowedError") {
+      speakNote.textContent = "The browser blocked audio playback. Press Read aloud again.";
+    } else if (midway) {
+      speakNote.textContent = `Audio stopped: ${err.message} Press Read aloud to try again.`;
+    } else {
+      const voice = deviceVoice(lastGuidance.speech_lang || "");
       if (voice) {
         speakNote.textContent = "Server audio unavailable — using this device's voice instead.";
-        speakWithBrowser(langTag, voice);
-      } else {
-        setSpeakState("idle");
-        speakNote.textContent = `${err.message} Please try again in a minute.`;
+        speakNote.classList.remove("hidden");
+        speakWithBrowser(lastGuidance.speech_lang, voice);
+        return;
       }
+      speakNote.textContent = `${err.message} Please try again in a minute.`;
     }
+    speakNote.classList.remove("hidden");
+  }
+
+  function speakWithServer() {
+    speechSession += 1;
+    const session = speechSession;
+
+    if (!speechParts[0]) {
+      setSpeakState("loading");
+      speakNote.textContent = "Generating audio — the first part takes a few seconds.";
+      speakNote.classList.remove("hidden");
+    }
+
+    playSpeechPart(0, session).catch((err) => speechFailed(err, session, false));
   }
 
   function speakGuidance() {
@@ -626,7 +658,7 @@
     if (isEnglish && speech) {
       speakWithBrowser(langTag, deviceVoice(langTag));
     } else {
-      speakWithServer(langTag);
+      speakWithServer();
     }
   }
 

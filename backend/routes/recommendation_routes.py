@@ -30,7 +30,7 @@ from backend.services.recommendation_service import (
     generate_recommendation,
     validate_request,
 )
-from backend.services.speech_service import speak_guidance
+from backend.services.speech_service import SpeechPartError, speak_guidance
 
 recommendation_bp = Blueprint(
     "recommendation",
@@ -82,17 +82,27 @@ def speech():
     """
 
     try:
-        predicted_class, level, alternatives, language = _validated(request.get_json(silent=True))
+        payload = request.get_json(silent=True)
+        predicted_class, level, alternatives, language = _validated(payload)
 
-        audio = speak_guidance(predicted_class, level, alternatives, language)
+        part = payload.get("part", 0)
+        if not isinstance(part, int) or isinstance(part, bool):
+            return _error("part must be an integer.", "INVALID_PART", 400)
+
+        audio = speak_guidance(predicted_class, level, alternatives, language, part)
 
         response = send_file(io.BytesIO(audio["wav"]), mimetype="audio/wav")
         response.headers["X-TTS-Model"] = audio["model"]
+        response.headers["X-Speech-Part"] = str(audio["part"])
+        response.headers["X-Speech-Parts"] = str(audio["parts"])
 
         return response
 
     except RecommendationRequestError as exc:
         return _error(str(exc), exc.code, exc.http_status)
+
+    except SpeechPartError as exc:
+        return _error(str(exc), "INVALID_PART", 400)
 
     except LLMError as exc:
         logger.warning("Speech failed [%s]: %s", exc.code, exc.detail)

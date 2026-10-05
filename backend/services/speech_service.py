@@ -24,7 +24,11 @@ from backend.services.recommendation_service import LRUCache, generate_recommend
 logger = logging.getLogger(__name__)
 
 # Audio is large (~48 KB per second); keep only a few results.
-AUDIO_CACHE_SIZE = 16
+AUDIO_CACHE_SIZE = 48
+
+# ~400 characters of Indian-language text is ~25 s of speech and takes
+# well under 10 s to synthesise; one long request timed out on Render.
+MAX_PART_CHARS = 400
 
 _audio_cache = LRUCache(AUDIO_CACHE_SIZE)
 
@@ -33,6 +37,51 @@ def clear_cache() -> None:
     """Empty the audio cache (used by tests)."""
 
     _audio_cache.clear()
+
+
+def split_for_speech(text: str, max_chars: int = MAX_PART_CHARS) -> List[str]:
+    """
+    Split text into parts of at most ~max_chars at sentence boundaries,
+    so each TTS request is short (faster, smaller, under the timeout).
+    """
+
+    sentences = [s.strip() for s in text.split(". ") if s.strip()]
+    parts: List[str] = []
+    current = ""
+
+    for sentence in sentences:
+        sentence = sentence if sentence.endswith(".") else sentence + "."
+
+        if current and len(current) + 1 + len(sentence) > max_chars:
+            parts.append(current)
+            current = sentence
+        else:
+            current = f"{current} {sentence}".strip()
+
+    if current:
+        parts.append(current)
+
+    return parts
+
+
+def _speech_parts(
+    predicted_class: str,
+    level: str,
+    alternatives: Sequence[str],
+    language: str,
+    provider: Any,
+) -> List[str]:
+    """Spoken text parts for the (cached) guidance."""
+
+    recommendation = generate_recommendation(
+        predicted_class,
+        level,
+        alternatives,
+        provider=provider,
+        language=language,
+    )
+
+    return split_for_speech(build_speech_text(recommendation))
 
 
 def build_speech_text(recommendation: Dict[str, Any]) -> str:
@@ -58,16 +107,28 @@ def build_speech_text(recommendation: Dict[str, Any]) -> str:
     return ". ".join(sentences) + "."
 
 
+class SpeechPartError(ValueError):
+    """Requested part index does not exist (HTTP 400)."""
+
+
 def speak_guidance(
     predicted_class: str,
     level: str,
     alternatives: Sequence[str],
     language: str,
+    part: int = 0,
 ) -> Dict[str, Any]:
     """
-    WAV audio of the guidance for a validated prediction.
+    WAV audio of one part of the guidance for a validated prediction.
+
+    The client plays part 0 as soon as it arrives and fetches the next
+    parts while it plays.
+
+    Returns:
+        {"wav", "model", "part", "parts", "characters"}
 
     Raises:
+        SpeechPartError: part out of range.
         LLMError subclasses when guidance or speech generation fails.
     """
 
@@ -76,33 +137,30 @@ def speak_guidance(
     if not hasattr(provider, "synthesize_speech"):
         raise LLMNotConfiguredError("The configured LLM provider has no text-to-speech.")
 
-    recommendation = generate_recommendation(
-        predicted_class,
-        level,
-        alternatives,
-        provider=provider,
-        language=language,
-    )
+    parts = _speech_parts(predicted_class, level, alternatives, language, provider)
 
-    text = build_speech_text(recommendation)
-    key = (provider.name, getattr(provider, "tts_model", None), text)
+    if not 0 <= part < len(parts):
+        raise SpeechPartError(f"part must be between 0 and {len(parts) - 1}.")
+
+    text = parts[part]
+    key = (provider.name, getattr(provider, "tts_model", None), language, text)
 
     cached = _audio_cache.get(key)
 
-    if cached is not None:
-        return cached
+    if cached is None:
+        audio = provider.synthesize_speech(text, LANGUAGES[language][2])
 
-    audio = provider.synthesize_speech(text, LANGUAGES[language][2])
+        logger.info(
+            "Synthesised part %d/%d (%d chars) of %s speech with %s (%.0f KB)",
+            part + 1,
+            len(parts),
+            len(text),
+            language,
+            audio.model,
+            len(audio.wav) / 1024,
+        )
 
-    logger.info(
-        "Synthesised %d chars of %s speech with %s (%.0f KB)",
-        len(text),
-        language,
-        audio.model,
-        len(audio.wav) / 1024,
-    )
+        cached = {"wav": audio.wav, "model": audio.model, "characters": len(text)}
+        _audio_cache.set(key, cached)
 
-    result = {"wav": audio.wav, "model": audio.model, "characters": len(text)}
-    _audio_cache.set(key, result)
-
-    return result
+    return {**cached, "part": part, "parts": len(parts)}
