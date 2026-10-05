@@ -58,7 +58,10 @@ crop for 15 of 20 test images (e.g. tomato leaves called potato).
   held-out accuracy, confidence levels, per-class accuracy, confusion
   matrix, calibration and training curves.
 - **Guidance in 12 languages** (`GET /languages`, `language` field on
-  `/analyze` and `/recommendation`) with a browser read-aloud button.
+  `/analyze` and `/recommendation`) with a read-aloud button: English uses
+  the browser's voice; other languages use server-generated audio
+  (`POST /speech`, Gemini TTS) because most devices have no Tamil, Telugu,
+  etc. voice installed.
 - **PDF report**: the browser print dialog's "Save as PDF" produces a
   one-page report with the photo, heat map, result and guidance.
 

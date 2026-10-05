@@ -53,6 +53,11 @@ DEFAULT_LLM_MODEL = "gemini-3.8-flash"
 # (429). Also free tier; set LLM_FALLBACK_MODEL= (empty) to disable.
 DEFAULT_LLM_FALLBACK_MODEL = "gemini-3.5-flash-lite"
 
+# Text-to-speech (read-aloud in languages devices often lack voices for).
+# Both have a free tier and support all app languages (verified 2026-10-06).
+DEFAULT_TTS_MODEL = "gemini-3.8-flash-lite-tts"
+DEFAULT_TTS_FALLBACK_MODEL = "gemini-3.8-flash-tts"
+
 
 def _env_float(name: str, default: float) -> float:
     """Read a float environment variable, falling back on bad input."""
@@ -77,6 +82,8 @@ class Settings:
     llm_api_key: str | None
     llm_model: str
     llm_fallback_model: str | None
+    tts_model: str | None
+    tts_fallback_model: str | None
     llm_timeout_seconds: float
     llm_temperature: float
 
@@ -120,6 +127,10 @@ def get_settings() -> Settings:
         llm_model=os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL).strip(),
         llm_fallback_model=(
             os.getenv("LLM_FALLBACK_MODEL", DEFAULT_LLM_FALLBACK_MODEL).strip() or None
+        ),
+        tts_model=os.getenv("LLM_TTS_MODEL", DEFAULT_TTS_MODEL).strip() or None,
+        tts_fallback_model=(
+            os.getenv("LLM_TTS_FALLBACK_MODEL", DEFAULT_TTS_FALLBACK_MODEL).strip() or None
         ),
         llm_timeout_seconds=_env_float("LLM_TIMEOUT_SECONDS", 30.0),
         llm_temperature=_env_float("LLM_TEMPERATURE", 0.2),

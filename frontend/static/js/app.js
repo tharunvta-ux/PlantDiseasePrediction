@@ -477,58 +477,157 @@
     treatmentError.classList.add("hidden");
     treatmentContent.classList.add("hidden");
     lastGuidance = null;
-    stopSpeaking();
+    discardSpeechAudio();
     speakBtn.classList.add("hidden");
     speakNote.classList.add("hidden");
   }
 
-  /* ---------- Read aloud (browser text-to-speech) ---------- */
+  /* ---------- Read aloud ----------
+   * English: the browser's own voice (every device has one).
+   * Other languages: audio generated on the server (Gemini TTS), because
+   * most devices have no Tamil / Telugu / ... voice installed; a device
+   * voice is only used if the server audio fails.
+   */
 
   const speech = "speechSynthesis" in window ? window.speechSynthesis : null;
+  let speechAudio = null; // HTMLAudioElement for server audio
+  let speechAudioUrl = null; // object URL, reused while the guidance is unchanged
+  let speechController = null;
+
+  function setSpeakState(state) {
+    const labels = { idle: "🔊 Read aloud", loading: "⏳ Preparing audio…", playing: "⏹ Stop reading" };
+    speakBtn.textContent = labels[state];
+    speakBtn.setAttribute("aria-pressed", state === "playing" ? "true" : "false");
+    speakBtn.disabled = state === "loading";
+  }
 
   function stopSpeaking() {
     if (speech) speech.cancel();
-    speakBtn.setAttribute("aria-pressed", "false");
-    speakBtn.textContent = "🔊 Read aloud";
+    if (speechAudio) speechAudio.pause();
+    if (speechController) speechController.abort();
+    speechController = null;
+    setSpeakState("idle");
   }
 
-  function guidanceSpeechText(result) {
+  function discardSpeechAudio() {
+    stopSpeaking();
+    if (speechAudioUrl) URL.revokeObjectURL(speechAudioUrl);
+    speechAudioUrl = null;
+    speechAudio = null;
+  }
+
+  function guidanceSentences(result) {
     const g = result.guidance;
-    const parts = [g.disease, g.what_it_means, g.uncertainty_note];
+    const parts = [g.disease, g.what_it_means];
+    if (result.confidence_level === "uncertain") parts.push(g.uncertainty_note);
     [g.common_symptoms, g.immediate_steps, g.recommended_treatment, g.preventive_measures, g.when_to_seek_expert_help]
       .forEach((list) => (list || []).forEach((item) => parts.push(item)));
-    return parts.filter(Boolean).join(". ");
+    return parts.filter(Boolean);
+  }
+
+  function deviceVoice(langTag) {
+    if (!speech) return null;
+    const prefix = langTag.split("-")[0].toLowerCase();
+    return speech.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith(prefix)) || null;
+  }
+
+  function speakWithBrowser(langTag, voice) {
+    speech.cancel();
+    // One utterance per sentence: Chrome cuts long utterances off after ~15 s.
+    const sentences = guidanceSentences(lastGuidance);
+    sentences.forEach((text, index) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = langTag;
+      if (voice) utterance.voice = voice;
+      utterance.rate = 0.95;
+      utterance.onerror = stopSpeaking;
+      if (index === sentences.length - 1) utterance.onend = () => setSpeakState("idle");
+      speech.speak(utterance);
+    });
+    setSpeakState("playing");
+  }
+
+  function playAudio() {
+    speechAudio.currentTime = 0;
+    speechAudio.play().then(() => setSpeakState("playing")).catch(() => {
+      setSpeakState("idle");
+      speakNote.textContent = "The browser blocked audio playback. Press Read aloud again.";
+      speakNote.classList.remove("hidden");
+    });
+  }
+
+  async function speakWithServer(langTag) {
+    if (speechAudio) {
+      playAudio();
+      return;
+    }
+
+    setSpeakState("loading");
+    speakNote.textContent = "Generating audio — this can take 10–20 seconds the first time.";
+    speakNote.classList.remove("hidden");
+
+    const controller = new AbortController();
+    speechController = controller;
+
+    try {
+      const response = await fetch("/speech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...lastPrediction, language: lastGuidance.language || currentLanguage() }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        let message = "Could not create the audio.";
+        try {
+          message = (await response.json()).error || message;
+        } catch (_) {
+          /* keep default */
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      if (controller !== speechController) return;
+
+      speechAudioUrl = URL.createObjectURL(blob);
+      speechAudio = new Audio(speechAudioUrl);
+      speechAudio.onended = () => setSpeakState("idle");
+      speakNote.classList.add("hidden");
+      speechController = null;
+      playAudio();
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      speechController = null;
+
+      const voice = deviceVoice(langTag);
+      if (voice) {
+        speakNote.textContent = "Server audio unavailable — using this device's voice instead.";
+        speakWithBrowser(langTag, voice);
+      } else {
+        setSpeakState("idle");
+        speakNote.textContent = `${err.message} Please try again in a minute.`;
+      }
+    }
   }
 
   function speakGuidance() {
-    if (!speech || !lastGuidance) return;
+    if (!lastGuidance || !lastPrediction) return;
 
     if (speakBtn.getAttribute("aria-pressed") === "true") {
       stopSpeaking();
       return;
     }
 
+    speakNote.classList.add("hidden");
     const langTag = lastGuidance.speech_lang || "en-IN";
-    const prefix = langTag.split("-")[0];
-    const voice = speech.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith(prefix));
+    const isEnglish = langTag.toLowerCase().startsWith("en");
 
-    const utterance = new SpeechSynthesisUtterance(guidanceSpeechText(lastGuidance));
-    utterance.lang = langTag;
-    if (voice) utterance.voice = voice;
-    utterance.rate = 0.95;
-    utterance.onend = stopSpeaking;
-    utterance.onerror = stopSpeaking;
-
-    if (!voice && prefix !== "en") {
-      speakNote.textContent =
-        "No voice for this language is installed on this device, so it may be read incorrectly or not at all.";
-      speakNote.classList.remove("hidden");
+    if (isEnglish && speech) {
+      speakWithBrowser(langTag, deviceVoice(langTag));
+    } else {
+      speakWithServer(langTag);
     }
-
-    speech.cancel();
-    speech.speak(utterance);
-    speakBtn.setAttribute("aria-pressed", "true");
-    speakBtn.textContent = "⏹ Stop reading";
   }
 
   function resetTreatmentPanel() {
@@ -585,7 +684,7 @@
     document.getElementById("guidanceDisclaimer").textContent = result.disclaimer || "";
 
     lastGuidance = result;
-    speakBtn.classList.toggle("hidden", !speech);
+    speakBtn.classList.remove("hidden"); // server audio works even without device voices
   }
 
   /* ---------- PDF report (browser "Save as PDF") ---------- */

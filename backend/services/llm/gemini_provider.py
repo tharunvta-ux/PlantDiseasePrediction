@@ -6,7 +6,10 @@ Google Gemini implementation of `LLMProvider` (google-genai SDK).
 
 from __future__ import annotations
 
+import io
 import logging
+import wave
+from dataclasses import dataclass
 from typing import Any, Dict
 
 import httpx
@@ -34,6 +37,36 @@ MAX_OUTPUT_TOKENS = 2048
 # Overloaded / rate-limited: worth trying the fallback model.
 FALLBACK_STATUSES = frozenset({429, 503})
 
+# Prebuilt Gemini TTS voice (multilingual).
+TTS_VOICE = "Kore"
+
+TTS_SAMPLE_RATE = 24000
+
+
+@dataclass(frozen=True)
+class SpeechAudio:
+    """Synthesised speech."""
+
+    wav: bytes
+    model: str
+
+
+def as_wav(data: bytes, sample_rate: int = TTS_SAMPLE_RATE) -> bytes:
+    """Return WAV bytes; raw 16-bit mono PCM gets a WAV header."""
+
+    if data[:4] == b"RIFF":
+        return data
+
+    buffer = io.BytesIO()
+
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        wav.writeframes(data)
+
+    return buffer.getvalue()
+
 
 class GeminiProvider:
     """Calls the Gemini API with structured JSON output."""
@@ -48,12 +81,15 @@ class GeminiProvider:
         temperature: float,
         base_url: str | None = None,
         fallback_model: str | None = None,
+        tts_model: str | None = None,
+        tts_fallback_model: str | None = None,
     ) -> None:
         """
         Args:
             base_url: Optional API endpoint override (proxies, tests).
             fallback_model: Model tried once when the primary model is
                 overloaded or rate-limited (HTTP 503 / 429).
+            tts_model / tts_fallback_model: Text-to-speech models.
         """
 
         if not api_key:
@@ -62,6 +98,10 @@ class GeminiProvider:
         self.model = model
         self.fallback_model = (
             fallback_model if fallback_model and fallback_model != model else None
+        )
+        self.tts_model = tts_model
+        self.tts_fallback_model = (
+            tts_fallback_model if tts_fallback_model and tts_fallback_model != tts_model else None
         )
         self.temperature = temperature
 
@@ -123,16 +163,70 @@ class GeminiProvider:
 
             return self._generate(self.fallback_model, contents, config)
 
-    def _generate(
-        self,
-        model: str,
-        contents: Any,
-        config: types.GenerateContentConfig,
-    ) -> LLMResponse:
-        """One generate_content call with error mapping."""
+    def synthesize_speech(self, text: str, language_tag: str) -> SpeechAudio:
+        """
+        Text-to-speech with the TTS model (falls back once on 503/429).
+
+        Returns:
+            WAV audio (24 kHz mono 16-bit).
+        """
+
+        if not self.tts_model:
+            raise LLMNotConfiguredError("No text-to-speech model configured.")
+
+        config = types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                language_code=language_tag,
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=TTS_VOICE)
+                ),
+            ),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        )
 
         try:
-            response = self._client.models.generate_content(
+            return self._speech(self.tts_model, text, config)
+
+        except LLMUpstreamError as exc:
+            if not self.tts_fallback_model or exc.status not in FALLBACK_STATUSES:
+                raise
+
+            logger.warning(
+                "TTS model %s unavailable (%s); falling back to %s",
+                self.tts_model,
+                exc.status,
+                self.tts_fallback_model,
+            )
+
+            return self._speech(self.tts_fallback_model, text, config)
+
+    def _speech(
+        self,
+        model: str,
+        text: str,
+        config: types.GenerateContentConfig,
+    ) -> SpeechAudio:
+        """One TTS call; returns WAV bytes."""
+
+        response = self._request(model, text, config)
+
+        try:
+            part = response.candidates[0].content.parts[0].inline_data
+            data = part.data
+        except (AttributeError, IndexError, TypeError) as exc:
+            raise LLMInvalidResponseError("No audio in TTS response.") from exc
+
+        if not data:
+            raise LLMInvalidResponseError("Empty audio in TTS response.")
+
+        return SpeechAudio(wav=as_wav(data), model=model)
+
+    def _request(self, model: str, contents: Any, config: types.GenerateContentConfig) -> Any:
+        """generate_content with network / API error mapping."""
+
+        try:
+            return self._client.models.generate_content(
                 model=model,
                 contents=contents,
                 config=config,
@@ -155,6 +249,16 @@ class GeminiProvider:
         except errors.APIError as exc:
             logger.warning("Gemini API error %s: %s", exc.code, exc.message)
             raise _map_api_error(exc) from exc
+
+    def _generate(
+        self,
+        model: str,
+        contents: Any,
+        config: types.GenerateContentConfig,
+    ) -> LLMResponse:
+        """One generate_content call returning JSON text."""
+
+        response = self._request(model, contents, config)
 
         text = getattr(response, "text", None)
 
