@@ -6,6 +6,7 @@ service code should depend only on `LLMProvider` and `LLMError`.
 """
 
 from backend.services.llm.base import (
+    ImageInput,
     LLMError,
     LLMInvalidResponseError,
     LLMNotConfiguredError,
@@ -18,6 +19,7 @@ from backend.services.llm.base import (
 from backend.services.llm.factory import get_llm_provider
 
 __all__ = [
+    "ImageInput",
     "LLMError",
     "LLMInvalidResponseError",
     "LLMNotConfiguredError",

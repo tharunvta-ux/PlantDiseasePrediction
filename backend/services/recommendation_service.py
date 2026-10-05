@@ -225,7 +225,7 @@ def redact_unsafe_items(guidance: TreatmentGuidance) -> int:
 # ==========================================================
 
 
-class _LRUCache:
+class LRUCache:
     """Tiny thread-safe LRU cache."""
 
     def __init__(self, size: int) -> None:
@@ -252,7 +252,7 @@ class _LRUCache:
             self._data.clear()
 
 
-_cache = _LRUCache(CACHE_SIZE)
+_cache = LRUCache(CACHE_SIZE)
 
 
 def clear_cache() -> None:

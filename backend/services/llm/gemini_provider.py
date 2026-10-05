@@ -14,6 +14,7 @@ from google import genai
 from google.genai import errors, types
 
 from backend.services.llm.base import (
+    ImageInput,
     LLMInvalidResponseError,
     LLMNotConfiguredError,
     LLMResponse,
@@ -78,11 +79,21 @@ class GeminiProvider:
         system_prompt: str,
         user_prompt: str,
         response_schema: Dict[str, Any],
+        image: ImageInput | None = None,
     ) -> LLMResponse:
         """
-        Generate JSON text, falling back to `fallback_model` once if the
-        primary model is overloaded or rate-limited.
+        Generate JSON text (optionally about an image), falling back to
+        `fallback_model` once if the primary model is overloaded or
+        rate-limited.
         """
+
+        contents: Any = user_prompt
+
+        if image is not None:
+            contents = [
+                types.Part.from_bytes(data=image.data, mime_type=image.mime_type),
+                user_prompt,
+            ]
 
         config = types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -97,7 +108,7 @@ class GeminiProvider:
         )
 
         try:
-            return self._generate(self.model, user_prompt, config)
+            return self._generate(self.model, contents, config)
 
         except LLMUpstreamError as exc:
             if not self.fallback_model or exc.status not in FALLBACK_STATUSES:
@@ -110,12 +121,12 @@ class GeminiProvider:
                 self.fallback_model,
             )
 
-            return self._generate(self.fallback_model, user_prompt, config)
+            return self._generate(self.fallback_model, contents, config)
 
     def _generate(
         self,
         model: str,
-        user_prompt: str,
+        contents: Any,
         config: types.GenerateContentConfig,
     ) -> LLMResponse:
         """One generate_content call with error mapping."""
@@ -123,7 +134,7 @@ class GeminiProvider:
         try:
             response = self._client.models.generate_content(
                 model=model,
-                contents=user_prompt,
+                contents=contents,
                 config=config,
             )
 

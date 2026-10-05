@@ -29,6 +29,22 @@ uploads/
 
 ✅ Module 1 Completed
 
+## How an image is analysed (`POST /analyze`)
+
+1. **Plant identification** (Gemini vision): is it a plant, which plant,
+   is it one of the 14 crops the disease model supports?
+2. **Disease diagnosis** (trained CNN): only for supported crops, with
+   calibrated confidence levels. If the AI identifies a different crop
+   than the CNN, the CNN's best match *within* that crop is shown as
+   uncertain.
+3. **Other plants**: an AI observation of visible symptoms, clearly
+   marked as unverified.
+4. **Treatment guidance** (`POST /recommendation`): Gemini explains the
+   CNN's diagnosis using curated disease facts.
+
+If Gemini is unavailable, `/analyze` falls back to the CNN result alone.
+`POST /predict` returns the CNN result only (unchanged API).
+
 ## Deploy on Render (free plan)
 
 The web service runs the model as a compact TFLite file

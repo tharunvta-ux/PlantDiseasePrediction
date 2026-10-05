@@ -41,7 +41,7 @@
     <div class="hero-grid">
       <div>
         <span class="badge">
-          <span class="badge-dot"></span> AI vision · 14 crops · 38 leaf classes
+          <span class="badge-dot"></span> AI plant ID · disease model for 14 crops · 38 leaf classes
         </span>
         <h1 class="hero-title">
           Check plant leaves <span class="gradient-text">for disease.</span>
@@ -155,6 +155,7 @@
           </div>
           <button type="button" id="chooseBtn" class="btn-primary btn-pill">Choose image</button>
           <p class="dropzone-hint">JPG · PNG · Max 10MB</p>
+          <p class="dropzone-hint">Photos are sent to Google Gemini to identify the plant.</p>
         </label>
 
         <div id="previewArea" class="preview-area hidden">
@@ -208,15 +209,18 @@
           </div>
 
           <div id="resultChips" class="result-chips">
+            <span id="plantChip" class="chip chip-plant hidden"></span>
             <span id="cropChip" class="chip"></span>
             <span id="healthChip" class="chip"></span>
           </div>
 
           <p id="resultMessage" class="result-message"></p>
 
+          <ul id="analysisNotes" class="analysis-notes hidden"></ul>
+
           <ul id="qualityWarnings" class="quality-warnings hidden"></ul>
 
-          <div class="top3-section">
+          <div id="top3Section" class="top3-section">
             <p id="top3Eyebrow" class="result-eyebrow">Top predictions</p>
             <div id="top3List" class="top3-list"></div>
           </div>
@@ -226,6 +230,30 @@
           <p id="errorMessage"></p>
         </div>
       </div>
+    </div>
+
+    <!-- AI plant observation (vision LLM, unverified) -->
+    <div id="observationPanel" class="treatment-panel glass hidden" aria-live="polite">
+      <div class="result-header">
+        <h3>AI plant observation</h3>
+        <span class="status-badge badge-warn">Unverified</span>
+      </div>
+      <p id="obsIntro" class="treatment-meaning"></p>
+      <div class="treatment-grid">
+        <section class="treatment-card">
+          <h5>Visible symptoms</h5>
+          <ul id="obsSymptoms"></ul>
+        </section>
+        <section class="treatment-card">
+          <h5>Possible issues</h5>
+          <ul id="obsIssues"></ul>
+        </section>
+        <section class="treatment-card treatment-card-wide">
+          <h5>General care steps</h5>
+          <ul id="obsAdvice"></ul>
+        </section>
+      </div>
+      <p id="obsMeta" class="treatment-meta"></p>
     </div>
 
     <!-- Treatment guidance (LLM) -->

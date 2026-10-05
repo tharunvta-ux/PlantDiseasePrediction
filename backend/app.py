@@ -11,6 +11,7 @@ from flask import Flask
 from flask import jsonify
 
 from backend.config import MAX_UPLOAD_BYTES
+from backend.routes.analysis_routes import analysis_bp
 from backend.routes.frontend_routes import frontend_bp
 from backend.routes.prediction_routes import prediction_bp
 from backend.routes.recommendation_routes import recommendation_bp
@@ -39,6 +40,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(prediction_bp)
     app.register_blueprint(recommendation_bp)
+    app.register_blueprint(analysis_bp)
     app.register_blueprint(frontend_bp)
 
     @app.errorhandler(413)

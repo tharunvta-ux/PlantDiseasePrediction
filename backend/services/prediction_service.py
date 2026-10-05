@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List
@@ -162,9 +163,27 @@ def build_prediction_result(
     }
 
 
+@dataclass(frozen=True)
+class PredictionRun:
+    """API result plus the raw material other services may need."""
+
+    result: Dict[str, Any]
+    calibrated_probabilities: np.ndarray
+    class_names: List[str]
+    calibration: CalibrationConfig | None
+
+
 def analyze_image(image_path: str) -> Dict[str, Any]:
     """
     Full prediction pipeline for one uploaded image.
+    """
+
+    return run_prediction(image_path).result
+
+
+def run_prediction(image_path: str) -> PredictionRun:
+    """
+    Run quality checks + model + calibration for one image.
     """
 
     predictor = get_predictor()
@@ -196,4 +215,15 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
         metrics.to_dict(),
     )
 
-    return result
+    calibrated = (
+        apply_temperature(probabilities, calibration.temperature)
+        if calibration
+        else probabilities
+    )
+
+    return PredictionRun(
+        result=result,
+        calibrated_probabilities=calibrated,
+        class_names=list(predictor.class_names),
+        calibration=calibration,
+    )

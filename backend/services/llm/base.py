@@ -14,6 +14,14 @@ from typing import Any, Dict, Protocol
 
 
 @dataclass(frozen=True)
+class ImageInput:
+    """An image passed to a vision-capable model."""
+
+    data: bytes
+    mime_type: str
+
+
+@dataclass(frozen=True)
 class LLMResponse:
     """Raw provider output plus the model that actually produced it."""
 
@@ -106,9 +114,11 @@ class LLMProvider(Protocol):
         system_prompt: str,
         user_prompt: str,
         response_schema: Dict[str, Any],
+        image: ImageInput | None = None,
     ) -> LLMResponse:
         """
-        Generate a JSON document conforming to `response_schema`.
+        Generate a JSON document conforming to `response_schema`,
+        optionally looking at `image`.
 
         Returns:
             The raw JSON text (validated by the caller) and the model used.

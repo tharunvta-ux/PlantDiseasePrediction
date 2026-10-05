@@ -27,6 +27,10 @@
   const qualityWarnings = document.getElementById("qualityWarnings");
   const top3Eyebrow = document.getElementById("top3Eyebrow");
   const resultChips = document.getElementById("resultChips");
+  const plantChip = document.getElementById("plantChip");
+  const analysisNotes = document.getElementById("analysisNotes");
+  const top3Section = document.getElementById("top3Section");
+  const observationPanel = document.getElementById("observationPanel");
 
   const treatmentPanel = document.getElementById("treatmentPanel");
   const treatmentLoading = document.getElementById("treatmentLoading");
@@ -91,6 +95,7 @@
   function resetResultPanel(message) {
     setStatus("idle");
     resetTreatmentPanel();
+    observationPanel.classList.add("hidden");
     resultSkeleton.classList.remove("hidden");
     resultContent.classList.add("hidden");
     resultError.classList.add("hidden");
@@ -105,7 +110,8 @@
     resultSkeleton.classList.remove("hidden");
     resultContent.classList.add("hidden");
     resultError.classList.add("hidden");
-    skeletonMessage.textContent = "Model is inspecting leaf texture, edges and lesions…";
+    skeletonMessage.textContent = "Identifying the plant and inspecting the leaf…";
+    observationPanel.classList.add("hidden");
   }
 
   function showResult(data) {
@@ -113,6 +119,8 @@
     resultSkeleton.classList.add("hidden");
     resultError.classList.add("hidden");
     resultContent.classList.remove("hidden");
+    top3Section.classList.remove("hidden");
+    resultConfidence.classList.remove("hidden");
 
     const level = data.confidence_level || null;
     const shownConfidence =
@@ -199,10 +207,13 @@
     resultChips.classList.toggle("hidden", !hasDetails);
     if (!hasDetails) return;
 
+    cropChip.classList.remove("hidden");
     cropChip.textContent =
       level === "low"
-        ? `Plant: uncertain`
-        : `Plant: ${data.crop} (${data.crop_confidence.toFixed(1)}%)`;
+        ? `Crop: uncertain`
+        : typeof data.crop_confidence === "number"
+          ? `Crop: ${data.crop} (${data.crop_confidence.toFixed(1)}%)`
+          : `Crop: ${data.crop}`;
 
     const status = data.health_status;
     healthChip.className = `chip chip-${status}`;
@@ -210,6 +221,133 @@
       status === "healthy" ? "Appears healthy"
         : status === "diseased" ? "Signs of disease"
           : "Health status uncertain";
+  }
+
+  /* ---------- Hybrid analysis (CNN + AI plant identification) ---------- */
+
+  function fillNotes(notes) {
+    analysisNotes.innerHTML = "";
+    (notes || []).forEach((text) => {
+      const li = document.createElement("li");
+      li.textContent = text;
+      analysisNotes.appendChild(li);
+    });
+    analysisNotes.classList.toggle("hidden", !(notes && notes.length));
+  }
+
+  function renderPlantChip(analysis) {
+    const id = analysis.plant_identification;
+    plantChip.classList.remove("hidden");
+
+    if (id && id.is_plant) {
+      const sci = id.plant_scientific_name ? ` (${id.plant_scientific_name})` : "";
+      plantChip.textContent =
+        `🌿 ${id.plant_common_name || "Unknown plant"}${sci} · AI-identified, ${id.identification_confidence} confidence`;
+    } else if (id && !id.is_plant) {
+      plantChip.textContent = "No plant detected · AI";
+    } else {
+      plantChip.textContent = "Plant type not verified (AI identification unavailable)";
+    }
+  }
+
+  function showNoDiagnosis(analysis) {
+    const id = analysis.plant_identification || {};
+    setStatus("result");
+    resultSkeleton.classList.add("hidden");
+    resultError.classList.add("hidden");
+    resultContent.classList.remove("hidden");
+
+    levelBanner.className = "level-banner level-uncertain";
+    resultChips.classList.remove("hidden");
+    top3Section.classList.add("hidden");
+    cropChip.classList.add("hidden");
+
+    if (analysis.route === "not_plant") {
+      levelBanner.className = "level-banner level-low";
+      levelBanner.textContent = "No plant detected — nothing to diagnose.";
+      resultEyebrow.textContent = "Result";
+      resultClass.textContent = "No plant detected";
+      resultConfidence.classList.add("hidden");
+      healthChip.className = "chip hidden";
+    } else {
+      levelBanner.textContent =
+        "This plant is outside the disease model's 14 crops — showing an unverified AI observation instead.";
+      resultEyebrow.textContent = "Identified plant";
+      resultClass.textContent = id.plant_common_name || "Unknown plant";
+      resultConfidence.classList.remove("hidden");
+      resultConfidence.className = "confidence-badge level-uncertain";
+      resultConfidence.textContent = "Not covered by model";
+
+      const healthText = { yes: "AI: looks healthy", no: "AI: possible problem", unclear: "AI: health unclear" };
+      const healthClass = { yes: "chip-healthy", no: "chip-diseased", unclear: "chip-uncertain" };
+      healthChip.className = `chip ${healthClass[id.appears_healthy] || "chip-uncertain"}`;
+      healthChip.textContent = healthText[id.appears_healthy] || "AI: health unclear";
+    }
+
+    resultMessage.textContent = analysis.message || "";
+    resultMessage.classList.toggle("hidden", !analysis.message);
+
+    const warnings = (analysis.prediction && analysis.prediction.quality_warnings) || [];
+    qualityWarnings.innerHTML = "";
+    warnings.forEach((w) => {
+      const li = document.createElement("li");
+      li.textContent = w.message;
+      qualityWarnings.appendChild(li);
+    });
+    qualityWarnings.classList.toggle("hidden", warnings.length === 0);
+  }
+
+  function renderObservation(analysis) {
+    const id = analysis.plant_identification;
+    if (!analysis.show_llm_observation || !id) {
+      observationPanel.classList.add("hidden");
+      return;
+    }
+
+    observationPanel.classList.remove("hidden");
+    const name = id.plant_common_name || "this plant";
+    const healthy = { yes: "looks healthy", no: "shows possible problems", unclear: "has an unclear health status" };
+    document.getElementById("obsIntro").textContent =
+      `The AI thinks this is ${name} and that it ${healthy[id.appears_healthy] || "has an unclear health status"}. ` +
+      "This is an AI observation of the photo, not a model diagnosis — confirm with a local expert." +
+      (id.image_notes ? ` Photo note: ${id.image_notes}` : "");
+
+    fillList(document.getElementById("obsSymptoms"), id.visible_symptoms);
+    fillList(document.getElementById("obsIssues"), id.possible_issues);
+    fillList(document.getElementById("obsAdvice"), id.general_advice);
+    document.getElementById("obsMeta").textContent =
+      id.generated_by ? `Generated by ${id.generated_by.model}` : "";
+  }
+
+  function showAnalysis(analysis) {
+    const p = analysis.prediction;
+    const d = analysis.diagnosis;
+    const id = analysis.plant_identification;
+
+    if (d) {
+      showResult({
+        predicted_class: d.predicted_class,
+        confidence: d.confidence,
+        calibrated_confidence: d.confidence,
+        confidence_level: d.confidence_level,
+        top3_predictions: d.top3_predictions,
+        crop: id && id.supported_crop !== "none" ? id.supported_crop : p.crop,
+        crop_confidence: id && id.supported_crop !== "none" ? null : p.crop_confidence,
+        health_status: d.confidence_level === "low" ? "uncertain" : d.health_status,
+        message: analysis.message,
+        quality_warnings: p.quality_warnings,
+      });
+
+      if (d.source === "cnn_within_identified_crop") {
+        top3Eyebrow.textContent = `Model's top matches within ${id.supported_crop}`;
+      }
+    } else {
+      showNoDiagnosis(analysis);
+    }
+
+    renderPlantChip(analysis);
+    fillNotes(analysis.notes);
+    renderObservation(analysis);
   }
 
   function showError(message) {
@@ -398,7 +536,7 @@
     formData.append("file", selectedFile);
 
     try {
-      const response = await fetch("/predict", {
+      const response = await fetch("/analyze", {
         method: "POST",
         body: formData,
       });
@@ -415,9 +553,24 @@
         return;
       }
 
-      lastPrediction = data;
-      showResult(data);
-      requestRecommendation(data);
+      showAnalysis(data);
+
+      if (data.diagnosis) {
+        lastPrediction = {
+          predicted_class: data.diagnosis.predicted_class,
+          confidence_level: data.diagnosis.confidence_level,
+          top3_predictions: data.diagnosis.top3_predictions,
+        };
+        requestRecommendation(lastPrediction);
+      } else if (data.route === "unsupported_plant") {
+        lastPrediction = null;
+        treatmentPanel.classList.remove("hidden");
+        hideTreatmentStates();
+        treatmentUnavailable.classList.remove("hidden");
+        treatmentUnavailableText.textContent =
+          "Model-based treatment guidance is only available for the 14 supported crops. " +
+          "See the AI observation above and consult a local agricultural expert.";
+      }
     } catch (err) {
       showError("Could not reach the prediction server. Please try again.");
     } finally {
