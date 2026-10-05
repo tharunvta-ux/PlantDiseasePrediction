@@ -1,6 +1,6 @@
 {
   "model_version": "plant_disease_cnn_int8",
-  "created": "2026-09-30",
+  "created": "2026-10-05",
   "temperature": 1.0426164294541693,
   "provisional": true,
   "provisional_reason": "Derived from PlantVillage validation images only (lab photos, plain backgrounds). No labelled real-world images were available; real-world accuracy at these thresholds is unmeasured.",

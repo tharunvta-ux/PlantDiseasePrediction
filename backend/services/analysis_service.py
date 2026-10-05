@@ -8,13 +8,22 @@ Routes
 ------
 supported_crop     LLM says it is crop X and the CNN's top crop is X
                    -> CNN diagnosis as-is.
-crop_mismatch      LLM says crop X, CNN's top crop differs
-                   -> best CNN class *within crop X*, never "high".
-unsupported_plant  A plant the CNN was not trained on
-                   -> no CNN diagnosis; LLM observation (unverified).
+crop_mismatch      LLM names a different crop than the CNN (or says the
+                   plant is unsupported without high confidence)
+                   -> CNN diagnosis kept but capped at "uncertain"; the
+                   LLM's view and the CNN's best match within the LLM's
+                   crop are shown as notes.
+unsupported_plant  LLM is highly confident it is a plant the CNN was not
+                   trained on -> no CNN diagnosis; LLM observation.
 not_plant          Not a plant -> no diagnosis.
 unverified         Identification unavailable (LLM down / no key)
                    -> CNN result as before, flagged as unverified.
+
+Why the CNN wins crop disagreements: on PlantVillage leaves the vision
+LLM named the correct crop for only 15 of 20 test images (some wrong
+answers marked "high"), e.g. tomato leaves called potato. The CNN was
+trained on exactly these crops. The LLM's strength is rejecting
+non-plants and recognising plants outside the 14 crops.
 
 The CNN is the only source of disease diagnoses for supported crops.
 """
@@ -28,6 +37,7 @@ import numpy as np
 
 from backend.prediction.class_info import parse_class_name
 from backend.prediction.confidence import LEVEL_HIGH, LEVEL_LOW, LEVEL_UNCERTAIN
+from backend.services.languages import DEFAULT_LANGUAGE
 from backend.services.llm import LLMError
 from backend.services.plant_identification_service import NOT_SUPPORTED, identify_plant
 from backend.services.prediction_service import PredictionRun, run_prediction
@@ -143,7 +153,10 @@ def combine_results(
             "of a plant leaf."
         )
 
-    elif identification["supported_crop"] == NOT_SUPPORTED:
+    elif (
+        identification["supported_crop"] == NOT_SUPPORTED
+        and identification["identification_confidence"] == "high"
+    ):
         route = ROUTE_UNSUPPORTED
         diagnosis = None
         llm_observation = True
@@ -156,20 +169,33 @@ def combine_results(
 
     else:
         crop = identification["supported_crop"]
+        diagnosis = _diagnosis_from_prediction(prediction, "cnn")
 
-        if prediction["crop"] == crop:
+        if crop == prediction["crop"]:
             route = ROUTE_SUPPORTED
-            diagnosis = _diagnosis_from_prediction(prediction, "cnn")
             message = prediction["message"]
         else:
             route = ROUTE_MISMATCH
-            diagnosis = _diagnosis_within_crop(run, crop)
             llm_observation = True
+            ai_plant = identification["plant_common_name"] or crop
+
+            if diagnosis["confidence_level"] == LEVEL_HIGH:
+                diagnosis["confidence_level"] = LEVEL_UNCERTAIN
+
             notes.append(
-                f"The plant was identified as {crop}, but the disease model's "
-                f"top match was a {prediction['crop']} class. Showing the "
-                f"model's best {crop} match, marked uncertain."
+                f"The AI identified the plant as {ai_plant}, but the disease "
+                f"model recognised it as {prediction['crop']}. The model's "
+                "result is shown, marked uncertain - the two disagree."
             )
+
+            if crop != NOT_SUPPORTED:
+                alternative = _diagnosis_within_crop(run, crop)
+                diagnosis["alternative_if_ai_is_right"] = alternative
+                notes.append(
+                    f"If it is {crop}, the model's best {crop} match is "
+                    f"{alternative['display_name']}."
+                )
+
             message = (
                 f"Possible {diagnosis['display_name']}. The result is uncertain "
                 "because the plant identification and the disease model disagree."
@@ -202,7 +228,7 @@ def combine_results(
     }
 
 
-def analyze_upload(image_path: str) -> Dict[str, Any]:
+def analyze_upload(image_path: str, language: str = DEFAULT_LANGUAGE) -> Dict[str, Any]:
     """Run the CNN and plant identification on one image and combine."""
 
     run = run_prediction(image_path)
@@ -211,7 +237,11 @@ def analyze_upload(image_path: str) -> Dict[str, Any]:
     error = None
 
     try:
-        identification = identify_plant(image_path, supported_crops(run.class_names))
+        identification = identify_plant(
+            image_path,
+            supported_crops(run.class_names),
+            language=language,
+        )
     except LLMError as exc:
         logger.warning("Plant identification unavailable [%s]: %s", exc.code, exc.detail)
         error = exc

@@ -82,21 +82,41 @@ def test_supported_crop_uses_cnn():
     assert out["show_llm_observation"] is False
 
 
-def test_crop_mismatch_restricts_to_identified_crop():
+def test_crop_mismatch_keeps_cnn_but_uncertain():
+    """The CNN wins crop disagreements (the LLM mislabels similar leaves,
+    e.g. tomato as potato), but the result can no longer be 'high'."""
+
     probs = np.zeros(len(CLASS_NAMES), dtype=np.float32)
-    probs[CLASS_NAMES.index("Potato___Late_blight")] = 0.80
-    probs[CLASS_NAMES.index("Tomato___Late_blight")] = 0.15
-    probs[CLASS_NAMES.index("Tomato___healthy")] = 0.05
+    probs[CLASS_NAMES.index("Potato___Late_blight")] = 0.96
+    probs[CLASS_NAMES.index("Tomato___Late_blight")] = 0.03
+    probs[CLASS_NAMES.index("Tomato___healthy")] = 0.01
     out = combine_results(make_run(probs), identification(supported_crop="Tomato"))
 
     diag = out["diagnosis"]
     assert out["route"] == ROUTE_MISMATCH
-    assert diag["predicted_class"] == "Tomato___Late_blight"
-    assert diag["confidence"] == pytest.approx(75.0, abs=0.01)  # 0.15 / 0.20
-    assert diag["model_crop_probability"] == pytest.approx(20.0, abs=0.01)
-    assert diag["confidence_level"] == "uncertain"  # never high
-    assert all(p["class"].startswith("Tomato___") for p in diag["top3_predictions"])
+    assert diag["predicted_class"] == "Potato___Late_blight"
+    assert diag["source"] == "cnn"
+    assert diag["confidence_level"] == "uncertain"
+
+    alt = diag["alternative_if_ai_is_right"]
+    assert alt["predicted_class"] == "Tomato___Late_blight"
+    assert alt["confidence"] == pytest.approx(75.0, abs=0.01)  # 0.03 / 0.04
+    assert alt["model_crop_probability"] == pytest.approx(4.0, abs=0.01)
+    assert any("Tomato" in note for note in out["notes"])
     assert out["show_llm_observation"] is True
+
+
+def test_unsupported_without_high_confidence_keeps_cnn():
+    run = make_run(one_hot_like("Tomato___Early_blight", 0.97))
+    out = combine_results(
+        run,
+        identification(plant_common_name="Eggplant", supported_crop="none", identification_confidence="medium"),
+    )
+
+    assert out["route"] == ROUTE_MISMATCH
+    assert out["diagnosis"]["predicted_class"] == "Tomato___Early_blight"
+    assert out["diagnosis"]["confidence_level"] == "uncertain"
+    assert "alternative_if_ai_is_right" not in out["diagnosis"]
 
 
 def test_unsupported_plant_has_no_cnn_diagnosis():
@@ -304,9 +324,12 @@ def test_gemini_receives_image_part():
     not (os.getenv("LLM_API_KEY") or os.getenv("GEMINI_API_KEY")),
     reason="LLM_API_KEY not set - live identification test not run.",
 )
-def test_live_identifies_tomato_leaf():
-    image = first_val_image("Tomato___Early_blight")
+def test_live_recognises_a_leaf_as_a_plant():
+    """Only 'is a plant' is asserted: the exact crop is not reliable
+    (measured 15/20 correct on PlantVillage leaves; tomato is sometimes
+    called potato), which is why the CNN wins crop disagreements."""
+
+    image = first_val_image("Potato___Late_blight")
     result = ident.identify_plant(str(image), CROPS)
 
     assert result["is_plant"] is True
-    assert result["supported_crop"] == "Tomato"

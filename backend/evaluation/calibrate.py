@@ -42,7 +42,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy.optimize import minimize_scalar  # noqa: E402
 
-from backend.config import MODEL_ARTIFACTS_ROOT, PROJECT_ROOT, get_settings  # noqa: E402
+from backend.config import (  # noqa: E402
+    MODEL_ARTIFACTS_ROOT,
+    PLANTVILLAGE_DIR,
+    PROJECT_ROOT,
+    get_settings,
+)
 from backend.evaluation.collect_predictions import (  # noqa: E402
     CALIBRATION_RESULTS_DIR,
     default_output,
@@ -342,6 +347,31 @@ def calibrate(predictions_file: Path) -> Dict[str, Any]:
         if (t_labels == i).any()
     }
 
+    # Confusion matrix on the held-out half: rows = true, cols = predicted.
+    confusion = np.zeros((len(class_names), len(class_names)), dtype=int)
+    np.add.at(confusion, (t_labels, t_pred), 1)
+
+    top_confusions = [
+        {"true": class_names[i], "predicted": class_names[j], "count": int(confusion[i, j])}
+        for i, j in zip(*np.nonzero(confusion))
+        if i != j
+    ]
+    top_confusions.sort(key=lambda item: -item["count"])
+
+    train_dir = PLANTVILLAGE_DIR / "train"
+    class_counts = {
+        "test": {name: int((t_labels == i).sum()) for i, name in enumerate(class_names)},
+        "train": (
+            {
+                name: sum(1 for _ in (train_dir / name).iterdir())
+                for name in class_names
+                if (train_dir / name).exists()
+            }
+            if train_dir.exists()
+            else None
+        ),
+    }
+
     q_calib = quality[calib_idx]
     col = {name: i for i, name in enumerate(quality_columns)}
     quality_reference = {
@@ -372,9 +402,16 @@ def calibrate(predictions_file: Path) -> Dict[str, Any]:
         ),
     }
 
+    model_files = [
+        PROJECT_ROOT / "saved_models" / f"{model_version}{suffix}"
+        for suffix in (".keras", ".tflite")
+    ]
+    model_size_bytes = next((f.stat().st_size for f in model_files if f.exists()), None)
+
     report = {
         "model_version": model_version,
         "created": date.today().isoformat(),
+        "model_size_bytes": model_size_bytes,
         "data": {
             "source": str(predictions_file.relative_to(PROJECT_ROOT)),
             "calibration_images": int(len(calib_idx)),
@@ -410,6 +447,10 @@ def calibrate(predictions_file: Path) -> Dict[str, Any]:
             "ece_calibrated": round(expected_calibration_error(t_conf, t_correct), 4),
             "levels": summarise_levels(t_conf, t_correct, high, low),
             "quality_flags": quality_flag_stats,
+            "class_names": class_names,
+            "confusion_matrix": confusion.tolist(),
+            "top_confusions": top_confusions[:15],
+            "class_counts": class_counts,
             "per_class_accuracy": per_class,
         },
     }
@@ -462,7 +503,8 @@ def main() -> None:
 
     report = calibrate(args.predictions)
 
-    summary = {k: v for k, v in report["test_metrics"].items() if k != "per_class_accuracy"}
+    bulky = {"per_class_accuracy", "class_names", "confusion_matrix", "top_confusions", "class_counts"}
+    summary = {k: v for k, v in report["test_metrics"].items() if k not in bulky}
 
     print(json.dumps(
         {

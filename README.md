@@ -45,6 +45,23 @@ uploads/
 If Gemini is unavailable, `/analyze` falls back to the CNN result alone.
 `POST /predict` returns the CNN result only (unchanged API).
 
+When the AI and the CNN name different crops, the CNN's result is kept
+but marked uncertain: on PlantVillage leaves Gemini named the correct
+crop for 15 of 20 test images (e.g. tomato leaves called potato).
+
+## Other features
+
+- **Where did the model look?** (`POST /explain`): occlusion-sensitivity
+  heat map. On sample images it shows the model partly relies on the
+  background and leaf edges, a known weakness of lab-photo training.
+- **Model performance page** (`/app/model`, data from `GET /model/report`):
+  held-out accuracy, confidence levels, per-class accuracy, confusion
+  matrix, calibration and training curves.
+- **Guidance in 12 languages** (`GET /languages`, `language` field on
+  `/analyze` and `/recommendation`) with a browser read-aloud button.
+- **PDF report**: the browser print dialog's "Save as PDF" produces a
+  one-page report with the photo, heat map, result and guidance.
+
 ## Deploy on Render (free plan)
 
 The web service runs the model as a compact TFLite file

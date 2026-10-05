@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Literal, Sequence
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field, ValidationError
 
+from backend.services.languages import DEFAULT_LANGUAGE, language_instruction
 from backend.services.llm import (
     ImageInput,
     LLMInvalidResponseError,
@@ -137,6 +138,7 @@ def identify_plant(
     image_path: str,
     supported_crops: Sequence[str],
     provider: LLMProvider | None = None,
+    language: str = DEFAULT_LANGUAGE,
 ) -> Dict[str, Any]:
     """
     Identify the plant in an image.
@@ -153,6 +155,7 @@ def identify_plant(
         provider.model,
         hashlib.sha256(image.data).hexdigest(),
         tuple(supported_crops),
+        language,
     )
 
     cached = _cache.get(key)
@@ -165,7 +168,9 @@ def identify_plant(
     response = provider.generate_json(
         SYSTEM_PROMPT,
         f"Allowed supported_crop values: {crops_text}, \"{NOT_SUPPORTED}\".\n"
-        "Identify the plant in this photo.",
+        "Identify the plant in this photo. Keep plant_common_name in English. "
+        "For visible_symptoms, possible_issues, general_advice and image_notes: "
+        f"{language_instruction(language)}",
         build_schema(supported_crops),
         image=image,
     )

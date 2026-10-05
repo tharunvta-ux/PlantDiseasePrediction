@@ -25,6 +25,11 @@ from pydantic import BaseModel, Field, ValidationError
 
 from backend.prediction.class_info import parse_class_name
 from backend.prediction.confidence import LEVEL_HIGH, LEVEL_LOW, LEVEL_UNCERTAIN
+from backend.services.languages import (
+    DEFAULT_LANGUAGE,
+    LANGUAGES,
+    language_instruction,
+)
 from backend.services.llm import (
     LLMInvalidResponseError,
     LLMProvider,
@@ -167,6 +172,7 @@ def build_user_prompt(
     predicted_class: str,
     level: str,
     alternatives: Sequence[str],
+    language: str = DEFAULT_LANGUAGE,
 ) -> str:
     """Compose the user prompt from validated model output only."""
 
@@ -178,7 +184,8 @@ def build_user_prompt(
 
     return (
         "Explain this plant-disease prediction and give structured "
-        "guidance.\n\n" + json.dumps(payload, indent=2)
+        f"guidance. {language_instruction(language)}\n\n"
+        + json.dumps(payload, indent=2)
     )
 
 
@@ -334,6 +341,7 @@ def generate_recommendation(
     level: str,
     alternatives: Sequence[str],
     provider: LLMProvider | None = None,
+    language: str = DEFAULT_LANGUAGE,
 ) -> Dict[str, Any]:
     """
     Produce structured guidance for a validated prediction.
@@ -344,17 +352,17 @@ def generate_recommendation(
 
     provider = provider or get_llm_provider()
 
-    key = (provider.name, provider.model, predicted_class, level, tuple(alternatives))
+    key = (provider.name, provider.model, predicted_class, level, tuple(alternatives), language)
 
     cached = _cache.get(key)
 
     if cached is not None:
-        logger.info("Recommendation cache hit for %s (%s)", predicted_class, level)
+        logger.info("Recommendation cache hit for %s (%s, %s)", predicted_class, level, language)
         return {**cached, "cached": True}
 
     response = provider.generate_json(
         SYSTEM_PROMPT,
-        build_user_prompt(predicted_class, level, alternatives),
+        build_user_prompt(predicted_class, level, alternatives, language),
         RESPONSE_SCHEMA,
     )
 
@@ -395,6 +403,8 @@ def generate_recommendation(
         "safety": {"redacted_items": removed},
         "generated_by": {"provider": provider.name, "model": response.model},
         "disclaimer": DISCLAIMER,
+        "language": language,
+        "speech_lang": LANGUAGES[language][2],
     }
 
     _cache.set(key, result)

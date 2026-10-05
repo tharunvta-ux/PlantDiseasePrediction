@@ -26,6 +26,7 @@
       <nav class="nav-links">
         <a href="#detect">Detect</a>
         <a href="#features">Features</a>
+        <a href="{{ url_for('frontend.model_performance') }}">Model</a>
         <a href="#">Pricing</a>
         <a href="#">Docs</a>
       </nav>
@@ -177,6 +178,12 @@
               <p id="fileName" class="file-name"></p>
               <p class="file-status">Ready to analyze</p>
             </div>
+            <label class="lang-picker">
+              <span>Guidance language</span>
+              <select id="languageSelect" aria-label="Language for AI guidance">
+                <option value="en">English</option>
+              </select>
+            </label>
             <div class="action-buttons">
               <button id="removeBtn" class="btn-outline btn-pill" type="button">Remove</button>
               <button id="predictBtn" class="btn-primary btn-pill" type="button">Predict disease</button>
@@ -224,6 +231,21 @@
             <p id="top3Eyebrow" class="result-eyebrow">Top predictions</p>
             <div id="top3List" class="top3-list"></div>
           </div>
+
+          <div id="explainSection" class="explain-section hidden">
+            <button id="explainBtn" class="btn-outline btn-pill" type="button">Show where the model looked</button>
+            <div id="explainLoading" class="treatment-loading hidden">
+              <div class="spinner"></div>
+              <p>Testing which parts of the photo the model relies on…</p>
+            </div>
+            <figure id="explainFigure" class="explain-figure hidden">
+              <img id="explainImage" alt="Heat map of the photo regions the model relied on" />
+              <figcaption id="explainCaption"></figcaption>
+            </figure>
+            <p id="explainError" class="explain-error hidden"></p>
+          </div>
+
+          <button id="reportBtn" class="btn-primary btn-pill report-btn" type="button">Download PDF report</button>
         </div>
 
         <div id="resultError" class="result-error hidden">
@@ -260,8 +282,12 @@
     <div id="treatmentPanel" class="treatment-panel glass hidden" aria-live="polite">
       <div class="result-header">
         <h3>Treatment guidance</h3>
-        <span class="status-badge">AI-generated</span>
+        <div class="header-actions">
+          <button id="speakBtn" class="btn-outline btn-pill speak-btn hidden" type="button" aria-pressed="false">🔊 Read aloud</button>
+          <span class="status-badge">AI-generated</span>
+        </div>
       </div>
+      <p id="speakNote" class="treatment-meta hidden"></p>
 
       <div id="treatmentLoading" class="treatment-loading hidden">
         <div class="spinner"></div>
@@ -394,6 +420,9 @@
       </div>
     </div>
   </footer>
+
+  <!-- Filled on demand and shown only when printing / saving as PDF -->
+  <section id="printReport" class="print-report" aria-hidden="true"></section>
 
   <script src="{{ url_for('frontend.static', filename='js/app.js') }}"></script>
 </body>

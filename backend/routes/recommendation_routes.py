@@ -17,6 +17,7 @@ from flask import jsonify
 from flask import request
 
 from backend.prediction.predictor import get_predictor
+from backend.services.languages import LANGUAGES, normalise_language
 from backend.services.llm import LLMError
 from backend.services.recommendation_service import (
     RecommendationRequestError,
@@ -38,6 +39,18 @@ def _error(message: str, code: str, status: int):
     return jsonify({"error": message, "code": code}), status
 
 
+@recommendation_bp.route("/languages", methods=["GET"])
+def languages():
+    """Languages available for AI-generated guidance."""
+
+    return jsonify(
+        [
+            {"code": code, "name": name, "native_name": native, "speech_lang": speech}
+            for code, (name, native, speech) in LANGUAGES.items()
+        ]
+    ), 200
+
+
 @recommendation_bp.route("/recommendation", methods=["POST"])
 def recommendation():
     """
@@ -57,7 +70,17 @@ def recommendation():
             get_predictor().class_names,
         )
 
-        result = generate_recommendation(predicted_class, level, alternatives)
+        language = normalise_language(payload.get("language"))
+
+        if language is None:
+            return _error("Unsupported language.", "INVALID_LANGUAGE", 400)
+
+        result = generate_recommendation(
+            predicted_class,
+            level,
+            alternatives,
+            language=language,
+        )
 
         return jsonify(result), 200
 

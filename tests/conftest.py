@@ -54,6 +54,12 @@ class FakePredictor:
     def predict_probabilities(self, image_path: str) -> np.ndarray:
         return self.probabilities
 
+    def preprocess_image(self, image_path: str) -> np.ndarray:
+        return np.full((1, 256, 256, 3), 0.5, dtype=np.float32)
+
+    def predict_batch(self, images: np.ndarray) -> np.ndarray:
+        return np.repeat(self.probabilities[None, :], len(images), axis=0)
+
 
 @pytest.fixture()
 def fake_predictor(monkeypatch) -> FakePredictor:
@@ -62,10 +68,12 @@ def fake_predictor(monkeypatch) -> FakePredictor:
     fake = FakePredictor()
 
     import backend.routes.recommendation_routes as rec_routes
+    import backend.services.explanation_service as explain_service
     import backend.services.prediction_service as pred_service
 
     monkeypatch.setattr(pred_service, "get_predictor", lambda: fake)
     monkeypatch.setattr(rec_routes, "get_predictor", lambda: fake)
+    monkeypatch.setattr(explain_service, "get_predictor", lambda: fake)
 
     return fake
 

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verdant — Model performance</title>
+  <meta name="description" content="Accuracy, calibration and error analysis of the plant disease model on held-out images." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="{{ url_for('frontend.static', filename='css/style.css') }}" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="nav-shell glass">
+      <a href="{{ url_for('frontend.index') }}" class="brand">
+        <span class="leaf-mark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M20 4C11 4 4 11 4 20c9 0 16-7 16-16Z" fill="currentColor" opacity=".95" />
+            <path d="M4 20C8 14 14 10 20 4" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity=".7" />
+          </svg>
+        </span>
+        <span class="brand-name">Verdant</span>
+      </a>
+      <nav class="nav-links">
+        <a href="{{ url_for('frontend.index') }}#detect">Detect</a>
+        <a href="{{ url_for('frontend.model_performance') }}" aria-current="page">Model</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="{{ url_for('frontend.index') }}#detect" class="btn-primary btn-pill">Try it</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="perf">
+    <div class="section-heading perf-heading">
+      <h2>Model performance</h2>
+      <p id="perfIntro">Loading evaluation results…</p>
+    </div>
+
+    <div id="perfError" class="result-error hidden"><p></p></div>
+
+    <div id="perfContent" class="hidden">
+      <div id="provisionalNote" class="level-banner level-uncertain"></div>
+
+      <!-- Headline numbers -->
+      <section class="stat-grid" id="statGrid" aria-label="Headline metrics"></section>
+
+      <!-- Confidence levels -->
+      <section class="perf-card glass">
+        <h3>Confidence levels</h3>
+        <p class="perf-sub">How reliable each level shown in the app is, on held-out images.</p>
+        <div class="table-wrap">
+          <table class="perf-table">
+            <thead>
+              <tr><th>Level</th><th>Rule (calibrated confidence)</th><th class="num">Share of images</th><th class="num">Accuracy</th><th class="num">95% interval</th></tr>
+            </thead>
+            <tbody id="levelsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Per-class accuracy -->
+      <section class="perf-card glass">
+        <h3>Accuracy per class</h3>
+        <p class="perf-sub">Held-out accuracy for each of the 38 classes, weakest first. Hover a bar for image counts.</p>
+        <div id="classBars" class="class-bars" role="list"></div>
+        <details class="table-view">
+          <summary>Table view</summary>
+          <div class="table-wrap">
+            <table class="perf-table">
+              <thead><tr><th>Class</th><th class="num">Accuracy</th><th class="num">Test images</th><th class="num">Training images</th></tr></thead>
+              <tbody id="classTableBody"></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <!-- Confusions -->
+      <section class="perf-card glass">
+        <h3>Where the model gets confused</h3>
+        <p class="perf-sub">Each cell: share of a true class (row) predicted as another class (column). Correct predictions (diagonal) are left out so the mistakes stand out.</p>
+        <div class="confusion-layout">
+          <div class="confusion-wrap">
+            <svg id="confusionSvg" class="confusion-svg" role="img" aria-label="Confusion matrix of mistakes between the 38 classes"></svg>
+            <div class="scale-legend" aria-hidden="true">
+              <span>0%</span><span class="scale-bar"></span><span id="scaleMax"></span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="perf-table">
+              <thead><tr><th>True class</th><th>Predicted as</th><th class="num">Images</th></tr></thead>
+              <tbody id="confusionBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Figures -->
+      <section class="perf-card glass">
+        <h3>Calibration and training</h3>
+        <div class="figure-grid" id="figureGrid"></div>
+      </section>
+
+      <!-- Comparison -->
+      <section class="perf-card glass hidden" id="comparisonCard">
+        <h3>Deployed model vs. original</h3>
+        <p class="perf-sub">The website runs a compressed (int8 TFLite) copy of the trained CNN so it fits in 512 MB of server memory.</p>
+        <div class="table-wrap">
+          <table class="perf-table">
+            <thead><tr><th>Metric</th><th class="num">Original (.keras)</th><th class="num">Deployed (int8 TFLite)</th></tr></thead>
+            <tbody id="comparisonBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Limitations -->
+      <section class="perf-card glass">
+        <h3>Limitations</h3>
+        <ul class="limits" id="limitsList"></ul>
+      </section>
+    </div>
+  </main>
+
+  <div id="vizTooltip" class="viz-tooltip hidden" role="tooltip"></div>
+
+  <script src="{{ url_for('frontend.static', filename='js/model.js') }}"></script>
+</body>
+</html>

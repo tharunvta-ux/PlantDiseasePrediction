@@ -31,3 +31,12 @@ def index():
     """
 
     return render_template("index.html")
+
+
+@frontend_bp.route("/model", methods=["GET"])
+def model_performance():
+    """
+    Render the model performance page.
+    """
+
+    return render_template("model.html")

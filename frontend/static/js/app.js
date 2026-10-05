@@ -44,11 +44,64 @@
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
+  const languageSelect = document.getElementById("languageSelect");
+  const explainSection = document.getElementById("explainSection");
+  const explainBtn = document.getElementById("explainBtn");
+  const explainLoading = document.getElementById("explainLoading");
+  const explainFigure = document.getElementById("explainFigure");
+  const explainImage = document.getElementById("explainImage");
+  const explainCaption = document.getElementById("explainCaption");
+  const explainError = document.getElementById("explainError");
+  const reportBtn = document.getElementById("reportBtn");
+  const printReport = document.getElementById("printReport");
+  const speakBtn = document.getElementById("speakBtn");
+  const speakNote = document.getElementById("speakNote");
+
   let selectedFile = null;
   let objectUrl = null;
   let lastPrediction = null;
   const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
   let recommendationController = null;
+
+  // Latest results, kept for the PDF report / read-aloud.
+  let lastAnalysis = null;
+  let lastGuidance = null;
+  let lastExplanation = null;
+  let languages = [{ code: "en", name: "English", native_name: "English", speech_lang: "en-IN" }];
+
+  const LANGUAGE_KEY = "verdant.language";
+
+  function storedLanguage() {
+    try {
+      return localStorage.getItem(LANGUAGE_KEY) || "en";
+    } catch (_) {
+      return "en";
+    }
+  }
+
+  function currentLanguage() {
+    return languageSelect.value || "en";
+  }
+
+  async function loadLanguages() {
+    try {
+      const response = await fetch("/languages");
+      if (response.ok) languages = await response.json();
+    } catch (_) {
+      /* keep English only */
+    }
+
+    languageSelect.innerHTML = "";
+    languages.forEach((lang) => {
+      const option = document.createElement("option");
+      option.value = lang.code;
+      option.textContent = lang.code === "en" ? lang.name : `${lang.native_name} (${lang.name})`;
+      languageSelect.appendChild(option);
+    });
+
+    const saved = storedLanguage();
+    languageSelect.value = languages.some((l) => l.code === saved) ? saved : "en";
+  }
 
   const LEVEL_TEXT = {
     high: "High confidence",
@@ -112,6 +165,60 @@
     resultError.classList.add("hidden");
     skeletonMessage.textContent = "Identifying the plant and inspecting the leaf…";
     observationPanel.classList.add("hidden");
+    resetExplanation();
+    lastAnalysis = null;
+  }
+
+  /* ---------- "Where did the model look?" ---------- */
+
+  function resetExplanation() {
+    lastExplanation = null;
+    explainSection.classList.add("hidden");
+    explainLoading.classList.add("hidden");
+    explainFigure.classList.add("hidden");
+    explainError.classList.add("hidden");
+    explainBtn.disabled = false;
+    explainBtn.classList.remove("hidden");
+  }
+
+  async function requestExplanation() {
+    if (!selectedFile || !lastPrediction) return;
+
+    explainBtn.disabled = true;
+    explainError.classList.add("hidden");
+    explainLoading.classList.remove("hidden");
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("target_class", lastPrediction.predicted_class);
+
+    try {
+      const response = await fetch("/explain", { method: "POST", body: formData });
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_) {
+        data = null;
+      }
+
+      if (!response.ok || !data || !data.overlay_png) {
+        throw new Error((data && data.error) || "Could not create the explanation.");
+      }
+
+      lastExplanation = data;
+      explainImage.src = data.overlay_png;
+      explainCaption.textContent =
+        `${data.explanation} (Explaining: ${formatClassName(data.target_class)}; ` +
+        `${data.grid[0]}×${data.grid[1]} occlusion test.)`;
+      explainFigure.classList.remove("hidden");
+      explainBtn.classList.add("hidden");
+    } catch (err) {
+      explainError.textContent = err.message || "Could not create the explanation.";
+      explainError.classList.remove("hidden");
+      explainBtn.disabled = false;
+    } finally {
+      explainLoading.classList.add("hidden");
+    }
   }
 
   function showResult(data) {
@@ -331,8 +438,9 @@
         calibrated_confidence: d.confidence,
         confidence_level: d.confidence_level,
         top3_predictions: d.top3_predictions,
-        crop: id && id.supported_crop !== "none" ? id.supported_crop : p.crop,
-        crop_confidence: id && id.supported_crop !== "none" ? null : p.crop_confidence,
+        // Crop as recognised by the trained model; the AI's view is in the plant chip.
+        crop: p.crop,
+        crop_confidence: p.crop_confidence,
         health_status: d.confidence_level === "low" ? "uncertain" : d.health_status,
         message: analysis.message,
         quality_warnings: p.quality_warnings,
@@ -348,6 +456,9 @@
     renderPlantChip(analysis);
     fillNotes(analysis.notes);
     renderObservation(analysis);
+
+    lastAnalysis = analysis;
+    explainSection.classList.toggle("hidden", !(d && d.confidence_level !== "low"));
   }
 
   function showError(message) {
@@ -365,6 +476,59 @@
     treatmentUnavailable.classList.add("hidden");
     treatmentError.classList.add("hidden");
     treatmentContent.classList.add("hidden");
+    lastGuidance = null;
+    stopSpeaking();
+    speakBtn.classList.add("hidden");
+    speakNote.classList.add("hidden");
+  }
+
+  /* ---------- Read aloud (browser text-to-speech) ---------- */
+
+  const speech = "speechSynthesis" in window ? window.speechSynthesis : null;
+
+  function stopSpeaking() {
+    if (speech) speech.cancel();
+    speakBtn.setAttribute("aria-pressed", "false");
+    speakBtn.textContent = "🔊 Read aloud";
+  }
+
+  function guidanceSpeechText(result) {
+    const g = result.guidance;
+    const parts = [g.disease, g.what_it_means, g.uncertainty_note];
+    [g.common_symptoms, g.immediate_steps, g.recommended_treatment, g.preventive_measures, g.when_to_seek_expert_help]
+      .forEach((list) => (list || []).forEach((item) => parts.push(item)));
+    return parts.filter(Boolean).join(". ");
+  }
+
+  function speakGuidance() {
+    if (!speech || !lastGuidance) return;
+
+    if (speakBtn.getAttribute("aria-pressed") === "true") {
+      stopSpeaking();
+      return;
+    }
+
+    const langTag = lastGuidance.speech_lang || "en-IN";
+    const prefix = langTag.split("-")[0];
+    const voice = speech.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith(prefix));
+
+    const utterance = new SpeechSynthesisUtterance(guidanceSpeechText(lastGuidance));
+    utterance.lang = langTag;
+    if (voice) utterance.voice = voice;
+    utterance.rate = 0.95;
+    utterance.onend = stopSpeaking;
+    utterance.onerror = stopSpeaking;
+
+    if (!voice && prefix !== "en") {
+      speakNote.textContent =
+        "No voice for this language is installed on this device, so it may be read incorrectly or not at all.";
+      speakNote.classList.remove("hidden");
+    }
+
+    speech.cancel();
+    speech.speak(utterance);
+    speakBtn.setAttribute("aria-pressed", "true");
+    speakBtn.textContent = "⏹ Stop reading";
   }
 
   function resetTreatmentPanel() {
@@ -419,6 +583,120 @@
     if (result.generated_by) meta.push(`Generated by ${result.generated_by.model}`);
     document.getElementById("guidanceMeta").textContent = meta.join(" · ");
     document.getElementById("guidanceDisclaimer").textContent = result.disclaimer || "";
+
+    lastGuidance = result;
+    speakBtn.classList.toggle("hidden", !speech);
+  }
+
+  /* ---------- PDF report (browser "Save as PDF") ---------- */
+
+  const esc = (value) =>
+    String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  const listHtml = (items) =>
+    items && items.length ? `<ul>${items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>` : "<p>—</p>";
+
+  function buildReport() {
+    const a = lastAnalysis;
+    if (!a) return "";
+
+    const d = a.diagnosis;
+    const id = a.plant_identification;
+    const now = new Date();
+    const parts = [];
+
+    parts.push(`<h1>Plant health report</h1>`);
+    parts.push(
+      `<p class="meta">Generated ${esc(now.toLocaleString())} · File: ${esc(selectedFile ? selectedFile.name : "")} · ` +
+      `Model: ${esc(a.prediction.model_version)}</p>`
+    );
+
+    const images = [`<figure><img src="${esc(previewImage.src)}" alt="Uploaded photo"><figcaption>Uploaded photo</figcaption></figure>`];
+    if (lastExplanation) {
+      images.push(
+        `<figure><img src="${esc(lastExplanation.overlay_png)}" alt="Model attention heat map">` +
+        `<figcaption>Where the model looked (red = most important)</figcaption></figure>`
+      );
+    }
+    parts.push(`<div class="images">${images.join("")}</div>`);
+
+    const plantLine = id
+      ? id.is_plant
+        ? `${esc(id.plant_common_name || "Unknown plant")}${id.plant_scientific_name ? ` (<i>${esc(id.plant_scientific_name)}</i>)` : ""} — AI identification, ${esc(id.identification_confidence)} confidence`
+        : "No plant detected"
+      : "Not verified (AI identification unavailable)";
+
+    const rows = [["Plant", plantLine]];
+    if (d) {
+      const shown = d.confidence_level === "low" ? "Uncertain — no diagnosis" : formatClassName(d.predicted_class);
+      rows.push(["Diagnosis (trained model)", esc(shown)]);
+      rows.push(["Confidence", `${esc(d.confidence.toFixed(1))}% · ${esc(LEVEL_TEXT[d.confidence_level] || d.confidence_level)}`]);
+      const health = { healthy: "Appears healthy", diseased: "Signs of disease", uncertain: "Uncertain" };
+      rows.push(["Health", esc(health[d.confidence_level === "low" ? "uncertain" : d.health_status])]);
+    } else {
+      rows.push(["Diagnosis (trained model)", "Not available for this photo"]);
+    }
+    parts.push(`<section><h2>Result</h2><table>${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${v}</td></tr>`).join("")}</table>`);
+    parts.push(`<p>${esc(a.message)}</p>`);
+    const notes = [...(a.notes || []), ...((a.prediction.quality_warnings || []).map((w) => w.message))];
+    if (notes.length) parts.push(listHtml(notes));
+    parts.push(`</section>`);
+
+    if (d && d.top3_predictions) {
+      parts.push(
+        `<section><h2>Top model predictions</h2><table>` +
+        d.top3_predictions.map((p) => `<tr><td>${esc(formatClassName(p.class))}</td><td>${esc(p.confidence.toFixed(1))}%</td></tr>`).join("") +
+        `</table></section>`
+      );
+    }
+
+    if (a.show_llm_observation && id) {
+      parts.push(
+        `<section><h2>AI observation (unverified)</h2>` +
+        `<p><b>Visible symptoms</b></p>${listHtml(id.visible_symptoms)}` +
+        `<p><b>Possible issues</b></p>${listHtml(id.possible_issues)}` +
+        `<p><b>General care steps</b></p>${listHtml(id.general_advice)}</section>`
+      );
+    }
+
+    if (lastGuidance) {
+      const g = lastGuidance.guidance;
+      parts.push(
+        `<section><h2>Treatment guidance (AI-generated)</h2>` +
+        `<p><b>${esc(g.disease)}</b></p><p>${esc(g.what_it_means)}</p>` +
+        (lastGuidance.confidence_level === "uncertain" ? `<p>${esc(g.uncertainty_note)}</p>` : "") +
+        `<p><b>Common symptoms</b></p>${listHtml(g.common_symptoms)}` +
+        `<p><b>Immediate steps</b></p>${listHtml(g.immediate_steps)}` +
+        `<p><b>Recommended treatment</b></p>${listHtml(g.recommended_treatment)}` +
+        `<p><b>Preventive measures</b></p>${listHtml(g.preventive_measures)}` +
+        `<p><b>When to seek expert help</b></p>${listHtml(g.when_to_seek_expert_help)}</section>`
+      );
+    }
+
+    parts.push(
+      `<p class="disclaimer">This report is produced automatically by an AI system and is not a confirmed diagnosis. ` +
+      `Treatment depends on the crop, severity and local regulations — always follow product labels and consult a local agricultural expert.</p>`
+    );
+
+    return parts.join("");
+  }
+
+  function downloadReport() {
+    if (!lastAnalysis) return;
+
+    printReport.innerHTML = buildReport();
+
+    const originalTitle = document.title;
+    const stamp = new Date().toISOString().slice(0, 10);
+    document.title = `plant-report-${stamp}`; // default PDF file name
+    window.addEventListener("afterprint", () => { document.title = originalTitle; }, { once: true });
+
+    // Wait for the report images to load before opening the print dialog.
+    const pending = [...printReport.querySelectorAll("img")]
+      .filter((img) => !img.complete)
+      .map((img) => new Promise((resolve) => { img.onload = img.onerror = resolve; }));
+
+    Promise.all(pending).then(() => window.print());
   }
 
   function showTreatmentError(message) {
@@ -461,6 +739,7 @@
           predicted_class: prediction.predicted_class,
           confidence_level: prediction.confidence_level,
           top3_predictions: prediction.top3_predictions,
+          language: currentLanguage(),
         }),
         signal: controller.signal,
       });
@@ -534,6 +813,7 @@
 
     const formData = new FormData();
     formData.append("file", selectedFile);
+    formData.append("language", currentLanguage());
 
     try {
       const response = await fetch("/analyze", {
@@ -606,4 +886,25 @@
   treatmentRetryBtn.addEventListener("click", () => {
     if (lastPrediction) requestRecommendation(lastPrediction);
   });
+
+  explainBtn.addEventListener("click", requestExplanation);
+  reportBtn.addEventListener("click", downloadReport);
+  speakBtn.addEventListener("click", speakGuidance);
+
+  languageSelect.addEventListener("change", () => {
+    try {
+      localStorage.setItem(LANGUAGE_KEY, currentLanguage());
+    } catch (_) {
+      /* preference just isn't remembered */
+    }
+    // Re-generate guidance for the current result in the new language.
+    if (lastPrediction && !treatmentPanel.classList.contains("hidden")) {
+      requestRecommendation(lastPrediction);
+    }
+  });
+
+  // Chrome loads the voice list asynchronously; asking early fills it.
+  if (speech) speech.getVoices();
+
+  loadLanguages();
 })();
