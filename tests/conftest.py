@@ -18,6 +18,11 @@ import pytest
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
+# Never touch the local instance/ database: importing backend.app builds
+# an app at module level. Tests that need a database use `client`.
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ.setdefault("SECRET_KEY", "test-secret")
+
 from backend.config import MODEL_ARTIFACTS_ROOT, PLANTVILLAGE_DIR, get_settings  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -68,21 +73,26 @@ def fake_predictor(monkeypatch) -> FakePredictor:
     fake = FakePredictor()
 
     import backend.routes.recommendation_routes as rec_routes
+    import backend.routes.tracking_routes as tracking_routes
     import backend.services.explanation_service as explain_service
     import backend.services.prediction_service as pred_service
 
     monkeypatch.setattr(pred_service, "get_predictor", lambda: fake)
     monkeypatch.setattr(rec_routes, "get_predictor", lambda: fake)
+    monkeypatch.setattr(tracking_routes, "get_predictor", lambda: fake)
     monkeypatch.setattr(explain_service, "get_predictor", lambda: fake)
 
     return fake
 
 
 @pytest.fixture()
-def client(tmp_path):
-    """Flask test client with an isolated upload folder."""
+def client(tmp_path, monkeypatch):
+    """Flask test client with an isolated upload folder and database."""
 
     from backend.app import create_app
+
+    db_file = tmp_path.parent / f"{tmp_path.name}-db" / "test.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file.as_posix()}")
 
     app = create_app()
     app.config.update(TESTING=True, UPLOAD_FOLDER=str(tmp_path))

@@ -42,6 +42,14 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 ALLOWED_EXTENSIONS = frozenset({"jpg", "jpeg", "png"})
 
 # -----------------------------------------------------
+# Database (accounts + treatment tracking)
+# -----------------------------------------------------
+
+# Local default. Render's disk is wiped on every deploy/restart, so
+# production must set DATABASE_URL to a hosted Postgres (Neon, Supabase).
+DEFAULT_DATABASE_URL = f"sqlite:///{(PROJECT_ROOT / 'instance' / 'verdant.db').as_posix()}"
+
+# -----------------------------------------------------
 # LLM defaults
 # -----------------------------------------------------
 
@@ -87,6 +95,9 @@ class Settings:
     tts_timeout_seconds: float
     llm_timeout_seconds: float
     llm_temperature: float
+    database_url: str
+    secret_key: str | None
+    session_cookie_secure: bool
 
     @property
     def model_artifacts_dir(self) -> Path:
@@ -105,6 +116,19 @@ class Settings:
         """True when an LLM API key is available."""
 
         return bool(self.llm_api_key)
+
+
+def normalise_database_url(url: str) -> str:
+    """
+    Use the psycopg 3 driver for Postgres URLs as given by Neon /
+    Supabase / Render ("postgres://..." or "postgresql://...").
+    """
+
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+
+    return url
 
 
 def get_settings() -> Settings:
@@ -136,4 +160,10 @@ def get_settings() -> Settings:
         tts_timeout_seconds=_env_float("LLM_TTS_TIMEOUT_SECONDS", 60.0),
         llm_timeout_seconds=_env_float("LLM_TIMEOUT_SECONDS", 30.0),
         llm_temperature=_env_float("LLM_TEMPERATURE", 0.2),
+        database_url=normalise_database_url(
+            os.getenv("DATABASE_URL", "").strip() or DEFAULT_DATABASE_URL
+        ),
+        secret_key=os.getenv("SECRET_KEY", "").strip() or None,
+        session_cookie_secure=os.getenv("SESSION_COOKIE_SECURE", "").strip().lower()
+        in ("1", "true", "yes"),
     )

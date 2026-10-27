@@ -23,3 +23,13 @@ services:
       # Secret: entered in the Render dashboard, never committed.
       - key: LLM_API_KEY
         sync: false
+      # Hosted Postgres (Neon / Supabase) connection string. Required:
+      # Render's disk is wiped on deploy/restart, so SQLite would lose
+      # every account and treatment history.
+      - key: DATABASE_URL
+        sync: false
+      # Signs the login cookie; generated once by Render.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SESSION_COOKIE_SECURE
+        value: "true"

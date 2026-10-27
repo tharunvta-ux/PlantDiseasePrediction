@@ -2,6 +2,8 @@
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("fileInput");
   const chooseBtn = document.getElementById("chooseBtn");
+  const cameraInput = document.getElementById("cameraInput");
+  const cameraBtn = document.getElementById("cameraBtn");
   const previewArea = document.getElementById("previewArea");
   const previewImage = document.getElementById("previewImage");
   const fileNameEl = document.getElementById("fileName");
@@ -145,7 +147,13 @@
     }
   }
 
+  // tracking.js listens for these to show the step-by-step plan.
+  function announce(name, detail) {
+    document.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+
   function resetResultPanel(message) {
+    announce("verdant:reset");
     setStatus("idle");
     resetTreatmentPanel();
     observationPanel.classList.add("hidden");
@@ -157,6 +165,7 @@
   }
 
   function showLoading() {
+    announce("verdant:reset");
     setStatus("loading");
     lastPrediction = null;
     resetTreatmentPanel();
@@ -926,6 +935,7 @@
     objectUrl = null;
     selectedFile = null;
     fileInput.value = "";
+    cameraInput.value = "";
 
     dropzone.classList.remove("hidden");
     previewArea.classList.add("hidden");
@@ -965,6 +975,7 @@
       }
 
       showAnalysis(data);
+      announce("verdant:analysis", { analysis: data, file: selectedFile });
 
       if (data.diagnosis) {
         lastPrediction = {
@@ -996,7 +1007,13 @@
     fileInput.click();
   });
 
+  cameraBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    cameraInput.click();
+  });
+
   fileInput.addEventListener("change", (e) => handleFiles(e.target.files));
+  cameraInput.addEventListener("change", (e) => handleFiles(e.target.files));
 
   dropzone.addEventListener("dragover", (e) => {
     e.preventDefault();

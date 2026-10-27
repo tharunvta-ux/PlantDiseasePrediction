@@ -1,0 +1,332 @@
+{
+  "_meta": {
+    "purpose": "Curated, step-by-step treatment plans used by treatment tracking. Chemical options are taken only from the TNAU Agritech Portal crop protection pages; the LLM never chooses products or doses.",
+    "source": "TNAU Agritech Portal - Crop Protection, https://agritech.tnau.ac.in/crop_protection/",
+    "checked_on": "2026-10-27",
+    "expert_reviewed": false,
+    "review_note": "Products and doses were copied from the TNAU pages linked per disease. Care steps without a TNAU page are general, low-risk cultural practices. An agronomist must review this file before production use, and product registration status must be re-checked periodically.",
+    "excluded_from_tnau": [
+      {
+        "chemical": "Captafol",
+        "listed_for": "Apple scab spray schedule",
+        "reason": "Banned in India for foliar spraying."
+      },
+      {
+        "chemical": "Tridemorph",
+        "listed_for": "Apple scab (pre-flowering spray)",
+        "reason": "Banned in India (2018 ban order)."
+      },
+      {
+        "chemical": "Streptocycline (streptomycin + tetracycline), Tetracycline",
+        "listed_for": "Tomato bacterial leaf spot, citrus greening",
+        "reason": "Antibiotics. The Government of India issued a draft order (Dec 2021) to prohibit their agricultural use because of antimicrobial resistance; not suggested by this app."
+      },
+      {
+        "chemical": "Methyl demeton",
+        "listed_for": "Tomato leaf curl (whitefly control)",
+        "reason": "Current registration status not verified; other listed options are shown instead."
+      }
+    ]
+  },
+  "classes": {
+    "Apple___Apple_scab": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/apple_1.html",
+      "care": [
+        "Collect and destroy fallen leaves and pruned material - the fungus survives the winter in them.",
+        "TNAU: spray urea 5% on the trees before autumn leaf fall (and 2% before bud break) so fallen leaves rot faster.",
+        "Prune to open the canopy so leaves dry quickly after rain."
+      ],
+      "products": [
+        {"name": "Mancozeb 75% WP", "dose": "0.25% (2.5 g per litre of water) at bearing stage", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Captan 50% WP", "dose": "200-300 g per 100 litres of spray fluid (TNAU schedule, by tree stage)", "kind": "fungicide", "group": "FRAC M04"},
+        {"name": "Carbendazim 50% WP", "dose": "50 g per 100 litres of spray fluid at petal fall", "kind": "fungicide", "group": "FRAC 1"}
+      ],
+      "wait_days": 10
+    },
+    "Apple___Black_rot": {
+      "source_url": null,
+      "care": [
+        "Prune out dead branches and cankers and remove mummified fruit from the tree and the ground.",
+        "Destroy the removed material away from the orchard.",
+        "Remove fallen infected leaves."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Apple___Cedar_apple_rust": {
+      "source_url": null,
+      "care": [
+        "Remove galls from nearby juniper / red cedar plants - the disease needs both hosts.",
+        "Remove badly affected leaves where practical.",
+        "Consider resistant apple varieties for new plantings."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Cherry_(including_sour)___Powdery_mildew": {
+      "source_url": null,
+      "care": [
+        "Remove and destroy badly affected shoots and leaves.",
+        "Prune to improve air movement through the canopy.",
+        "Avoid excess nitrogen fertiliser, which favours soft, susceptible growth."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot": {
+      "source_url": null,
+      "care": [
+        "After harvest, bury or remove infected crop residue.",
+        "Rotate with a non-host crop next season.",
+        "Choose tolerant hybrids for the next sowing."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Corn_(maize)___Common_rust_": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/maize_disease_new/maize_4.html",
+      "care": [
+        "Remove the alternate host weeds (Oxalis species) from the field and bunds.",
+        "After harvest, collect the crop remains and bury or destroy them.",
+        "TNAU timing: fungicide sprays are recommended at 35 and 50 days after sowing."
+      ],
+      "products": [
+        {"name": "Kresoxim-methyl 44.3% SC", "dose": "1 ml per litre of water", "kind": "fungicide", "group": "FRAC 11"},
+        {"name": "Tebuconazole", "dose": "1 ml per litre of water", "kind": "fungicide", "group": "FRAC 3"}
+      ],
+      "wait_days": 10
+    },
+    "Corn_(maize)___Northern_Leaf_Blight": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/maize_disease_new/maize_2.html",
+      "care": [
+        "Bury or remove infected maize stubble after harvest.",
+        "Rotate with a non-host crop next season.",
+        "TNAU timing: fungicide sprays are recommended at 35 and 50 days after sowing."
+      ],
+      "products": [
+        {"name": "Propiconazole 25% EC", "dose": "1 ml per litre of water", "kind": "fungicide", "group": "FRAC 3"},
+        {"name": "Mancozeb", "dose": "2-4 g per litre of water", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Zineb", "dose": "2-4 g per litre of water", "kind": "fungicide", "group": "FRAC M03"}
+      ],
+      "wait_days": 10
+    },
+    "Grape___Black_rot": {
+      "source_url": null,
+      "care": [
+        "Remove mummified berries and infected leaves and canes and destroy them.",
+        "Prune to keep the canopy open so leaves dry quickly.",
+        "Keep the ground under the vines clean of fallen debris."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Grape___Esca_(Black_Measles)": {
+      "source_url": null,
+      "care": [
+        "Mark affected vines and prune out dead wood in dry weather.",
+        "Disinfect pruning tools between vines.",
+        "Remove pruned wood from the vineyard."
+      ],
+      "products": [],
+      "wait_days": 14
+    },
+    "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)": {
+      "source_url": null,
+      "care": [
+        "Remove and destroy affected leaves.",
+        "Improve air movement by canopy management.",
+        "Avoid wetting the leaves when irrigating."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Orange___Haunglongbing_(Citrus_greening)": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/citrus_diseases_5.html",
+      "incurable": true,
+      "care": [
+        "There is no cure for citrus greening. Get the diagnosis confirmed by an expert before removing any tree.",
+        "Confirmed infected trees are usually removed so they do not infect healthy trees.",
+        "Control psyllids (the insects that spread the disease) - ask the expert which insecticide is approved locally.",
+        "Use only certified, pathogen-free bud wood or plants for replanting."
+      ],
+      "products": [],
+      "wait_days": 0
+    },
+    "Peach___Bacterial_spot": {
+      "source_url": null,
+      "care": [
+        "Prune out affected twigs in dry weather and destroy them.",
+        "Avoid overhead irrigation that wets the leaves.",
+        "Avoid excess nitrogen fertiliser."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Pepper,_bell___Bacterial_spot": {
+      "source_url": null,
+      "care": [
+        "Remove affected leaves and badly affected plants and destroy them.",
+        "Water at the base of the plant; do not work among wet plants.",
+        "Use disease-free seed and rotate crops next season."
+      ],
+      "products": [],
+      "wait_days": 5
+    },
+    "Potato___Early_blight": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/crop_prot_crop%20diseases_veg_potato_2.html",
+      "care": [
+        "Remove and destroy infected leaves and plant debris.",
+        "Use disease-free seed tubers next season.",
+        "TNAU: the variety Kufri Sindhuri has fair resistance."
+      ],
+      "products": [
+        {"name": "Zineb", "dose": "0.2% (2 g per litre of water), repeat every 15-20 days", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Captan", "dose": "0.2% (2 g per litre of water), repeat every 15-20 days", "kind": "fungicide", "group": "FRAC M04"}
+      ],
+      "wait_days": 10
+    },
+    "Potato___Late_blight": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/crop_prot_crop%20diseases_veg_potato_1.html",
+      "care": [
+        "Remove and destroy infected leaves and plants immediately - late blight spreads very fast in cool, wet weather.",
+        "Avoid injuring tubers at harvest and discard visibly infected tubers before storage.",
+        "TNAU resistant varieties: Kufri Naveen, Kufri Jeevan, Kufri Alankar, Kufri Khasi Garo, Kufri Moti."
+      ],
+      "products": [
+        {"name": "Mancozeb", "dose": "0.2% (2 g per litre of water), protective spray", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Zineb", "dose": "0.2% (2 g per litre of water), protective spray", "kind": "fungicide", "group": "FRAC M03"}
+      ],
+      "wait_days": 5
+    },
+    "Squash___Powdery_mildew": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/water_melon_6.html",
+      "care": [
+        "Remove badly affected leaves.",
+        "Give plants enough spacing for air movement.",
+        "Avoid excess nitrogen fertiliser."
+      ],
+      "products": [
+        {"name": "Wettable sulphur", "dose": "0.2% (2 g per litre of water)", "kind": "fungicide", "group": "FRAC M02"}
+      ],
+      "wait_days": 7
+    },
+    "Strawberry___Leaf_scorch": {
+      "source_url": null,
+      "care": [
+        "Remove and destroy infected leaves.",
+        "Water at the base of the plants, early in the day.",
+        "Keep the bed free of old leaves after harvest."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Tomato___Bacterial_spot": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/tomato_diseases_11.html",
+      "care": [
+        "Remove affected leaves and destroy them.",
+        "Water at the base of the plant; do not work among wet plants.",
+        "Use disease-free seed and rotate away from tomato and chilli next season."
+      ],
+      "products": [],
+      "wait_days": 5
+    },
+    "Tomato___Early_blight": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/tomato_diseases_2.html",
+      "care": [
+        "Remove and destroy affected lower leaves and crop debris (do not compost them).",
+        "Water at the base of the plant, not over the leaves.",
+        "Rotate crops: avoid tomato and potato on the same plot next season."
+      ],
+      "products": [
+        {"name": "Azoxystrobin 23% SC", "dose": "200 ml per acre", "kind": "fungicide", "group": "FRAC 11"},
+        {"name": "Pyraclostrobin 20% WG", "dose": "200 g per acre", "kind": "fungicide", "group": "FRAC 11"},
+        {"name": "Zineb 75% WP", "dose": "800 g per acre", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Iprodione 50% WP", "dose": "600 g per acre", "kind": "fungicide", "group": "FRAC 2"}
+      ],
+      "wait_days": 7
+    },
+    "Tomato___Late_blight": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/tomato_diseases_8.html",
+      "care": [
+        "Remove and destroy infected leaves and plants immediately - late blight spreads fast.",
+        "Improve field drainage and avoid wetting the leaves.",
+        "Rotate crops next season."
+      ],
+      "products": [
+        {"name": "Cyazofamid 34.5% SC", "dose": "80 ml per acre", "kind": "fungicide", "group": "FRAC 21"},
+        {"name": "Azoxystrobin 23% SC", "dose": "200 ml per acre", "kind": "fungicide", "group": "FRAC 11"},
+        {"name": "Zineb 75% WP", "dose": "800 g per acre", "kind": "fungicide", "group": "FRAC M03"}
+      ],
+      "wait_days": 5
+    },
+    "Tomato___Leaf_Mold": {
+      "source_url": null,
+      "care": [
+        "Remove and destroy affected leaves.",
+        "Reduce humidity: improve ventilation (especially in greenhouses) and space plants.",
+        "Water at the base of the plant, early in the day."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Tomato___Septoria_leaf_spot": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/tomato_diseases_4.html",
+      "care": [
+        "Remove and destroy affected leaves.",
+        "Water at the base of the plant, not over the leaves.",
+        "Next crop: TNAU recommends seed treatment with Trichoderma asperellum (4 g per kg of seed)."
+      ],
+      "products": [
+        {"name": "Fluxapyroxad 250 g/l + Pyraclostrobin 250 g/l SC", "dose": "200-250 ml per hectare", "kind": "fungicide", "group": "FRAC 7 + 11"}
+      ],
+      "wait_days": 7
+    },
+    "Tomato___Spider_mites Two-spotted_spider_mite": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/tomato/tomato_7.html",
+      "care": [
+        "Remove and destroy heavily infested leaves.",
+        "Spray water on the undersides of the leaves to knock mites off.",
+        "Keep plants well watered - mites build up fast in hot, dry conditions."
+      ],
+      "products": [
+        {"name": "Wettable sulphur 50% WP", "dose": "2 g per litre of water", "kind": "acaricide", "group": "sulphur"}
+      ],
+      "wait_days": 5
+    },
+    "Tomato___Target_Spot": {
+      "source_url": null,
+      "care": [
+        "Remove and destroy affected leaves and crop debris.",
+        "Improve air movement by staking and pruning lower leaves.",
+        "Water at the base of the plant."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/tomato_diseases_6.html",
+      "care": [
+        "Uproot and destroy plants that show leaf curl - infected plants do not recover.",
+        "Put up yellow sticky traps (TNAU: 5 per acre) to catch the whiteflies that spread the virus.",
+        "Remove the weed host Abutilon indicum (thuthi) around the field.",
+        "Grow sorghum, maize or bajra as a barrier crop around the next tomato crop."
+      ],
+      "products": [
+        {"name": "Thiamethoxam 25% WG", "dose": "200 g per acre", "kind": "insecticide (whitefly)", "group": "IRAC 4A"},
+        {"name": "Imidacloprid 17.8% SL", "dose": "200 ml per acre", "kind": "insecticide (whitefly)", "group": "IRAC 4A"},
+        {"name": "Dimethoate 30% EC", "dose": "200 ml per acre", "kind": "insecticide (whitefly)", "group": "IRAC 1B"}
+      ],
+      "wait_days": 7
+    },
+    "Tomato___Tomato_mosaic_virus": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/tomato_diseases_12.html",
+      "care": [
+        "Uproot and destroy infected plants - virus-infected plants do not recover.",
+        "Wash hands and disinfect tools after handling infected plants; the virus spreads by contact.",
+        "Use disease-free seed and rotate crops next season."
+      ],
+      "products": [],
+      "wait_days": 7
+    }
+  }
+}

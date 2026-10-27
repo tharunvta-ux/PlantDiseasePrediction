@@ -25,14 +25,16 @@
       </a>
       <nav class="nav-links">
         <a href="#detect">Detect</a>
+        <a href="#history">History <span id="dueCount" class="nav-count hidden"></span></a>
         <a href="#features">Features</a>
         <a href="{{ url_for('frontend.model_performance') }}">Model</a>
-        <a href="#">Pricing</a>
-        <a href="#">Docs</a>
       </nav>
       <div class="nav-actions">
-        <a href="#" class="link-muted">Sign in</a>
-        <a href="#detect" class="btn-primary btn-pill">Try free</a>
+        <span id="accountEmail" class="account-email hidden"></span>
+        <a href="#history" class="nav-history-mobile">History <span id="dueCountMobile" class="nav-count hidden"></span></a>
+        <button id="signOutBtn" type="button" class="nav-button hidden">Sign out</button>
+        <button id="signInBtn" type="button" class="nav-button">Sign in</button>
+        <a href="#detect" class="btn-primary btn-pill nav-try">Try free</a>
       </div>
     </div>
   </header>
@@ -135,8 +137,8 @@
   <!-- Detect / Upload -->
   <section id="detect" class="detect">
     <div class="section-heading">
-      <h2>Upload a leaf, get a prediction</h2>
-      <p>Drop a clear, well‑lit image of a single leaf that fills most of the frame. JPG or PNG, up to 10MB.</p>
+      <h2>Take or upload a photo, get a diagnosis</h2>
+      <p>Photograph a plant or a leaf in good light, close enough that the affected leaf fills most of the frame. JPG or PNG, up to 10MB.</p>
     </div>
 
     <div class="detect-grid">
@@ -144,6 +146,8 @@
       <div class="upload-card glass">
         <label id="dropzone" class="dropzone">
           <input id="fileInput" type="file" accept="image/jpeg,image/png" hidden />
+          <!-- Opens the back camera on phones; a normal file picker on desktops. -->
+          <input id="cameraInput" type="file" accept="image/jpeg,image/png" capture="environment" hidden />
           <div class="dropzone-icon">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
               <path d="M12 16V4m0 0-4 4m4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -154,7 +158,10 @@
             <p class="dropzone-title">Drag &amp; drop your image here</p>
             <p class="dropzone-sub">or click to browse from your device</p>
           </div>
-          <button type="button" id="chooseBtn" class="btn-primary btn-pill">Choose image</button>
+          <div class="dropzone-buttons">
+            <button type="button" id="cameraBtn" class="btn-primary btn-pill">📷 Take photo</button>
+            <button type="button" id="chooseBtn" class="btn-outline btn-pill">Choose image</button>
+          </div>
           <p class="dropzone-hint">JPG · PNG · Max 10MB</p>
           <p class="dropzone-hint">Photos are sent to Google Gemini to identify the plant.</p>
         </label>
@@ -338,6 +345,39 @@
         <p id="guidanceDisclaimer" class="treatment-disclaimer"></p>
       </div>
     </div>
+
+    <!-- Step-by-step plan + start tracking -->
+    <div id="planPanel" class="treatment-panel glass hidden" aria-live="polite">
+      <div class="result-header">
+        <h3>What to do now</h3>
+        <span class="status-badge">Step 1</span>
+      </div>
+      <div id="planStep"></div>
+      <div class="plan-actions">
+        <button id="trackBtn" class="btn-primary btn-pill" type="button">Track this treatment</button>
+        <p id="trackNote" class="treatment-meta"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Treatment history -->
+  <section id="history" class="detect history">
+    <div class="section-heading">
+      <h2>Treatment history</h2>
+      <p>Follow each problem step by step. When a check is due, tell us whether the step worked. If it did not, the next step is suggested, and an expert is suggested when nothing else is left.</p>
+    </div>
+
+    <div id="historySignedOut" class="treatment-panel glass history-empty">
+      <p>Sign in to save treatments and track whether they work.</p>
+      <button id="historySignInBtn" class="btn-primary btn-pill" type="button">Sign in or create an account</button>
+    </div>
+
+    <div id="historySignedIn" class="hidden">
+      <div id="dueBanner" class="level-banner level-uncertain hidden" role="status"></div>
+      <p id="historyEmpty" class="treatment-note hidden">No treatments yet. Diagnose a plant above and press "Track this treatment".</p>
+      <p id="historyError" class="result-error hidden"></p>
+      <div id="caseList" class="case-list"></div>
+    </div>
   </section>
 
   <!-- Features -->
@@ -424,6 +464,35 @@
   <!-- Filled on demand and shown only when printing / saving as PDF -->
   <section id="printReport" class="print-report" aria-hidden="true"></section>
 
+  <dialog id="authDialog" class="auth-dialog glass">
+    <form id="authForm" method="dialog" novalidate>
+      <div class="result-header">
+        <h3 id="authTitle">Sign in</h3>
+        <button id="authCloseBtn" class="remove-btn auth-close" type="button" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <p class="auth-sub">Your treatment history is saved to your account.</p>
+      <label class="field">
+        <span>Email</span>
+        <input id="authEmail" type="email" autocomplete="email" required />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input id="authPassword" type="password" autocomplete="current-password" minlength="8" required />
+      </label>
+      <p id="authError" class="explain-error hidden"></p>
+      <button id="authSubmit" class="btn-primary btn-pill auth-submit" type="submit">Sign in</button>
+      <p class="auth-switch">
+        <span id="authSwitchText">No account yet?</span>
+        <button id="authSwitchBtn" type="button" class="link-button">Create one</button>
+      </p>
+    </form>
+  </dialog>
+
   <script src="{{ url_for('frontend.static', filename='js/app.js') }}"></script>
+  <script src="{{ url_for('frontend.static', filename='js/tracking.js') }}"></script>
 </body>
 </html>
