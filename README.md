@@ -99,6 +99,23 @@ crop for 15 of 20 test images (e.g. tomato leaves called potato).
   plan, and a confirmed uncertain diagnosis unlocks the TNAU treatment.
   Otherwise the next step is suggested.
 
+- **Confirming an AI match:** the grower first confirms the crop ("Is
+  this a papaya plant?"), then answers 2–3 yes/no symptom checks
+  (`checks` in `ai_condition_plans.json`). All yes → TNAU treatment;
+  partly → care steps first; all no → general care. "Not sure? Ask an
+  expert first" offers the Kisan Call Centre and KVK links.
+- **Severity and outlook** (`backend/prediction/severity.py`,
+  `backend/services/severity_service.py`): share of leaf area that is
+  spotted / yellow / brown / powdery (OpenCV colour segmentation,
+  approximate), combined with the grower's "How much of the plant has
+  this?" (the worse one counts) → mild / moderate / severe. The outlook
+  is good / fair / poor with its reason, deliberately not a percentage.
+  At check-ins the new photo is compared with the last one: a shrinking
+  disease keeps the current step going once instead of switching
+  chemicals; a fast-spreading severe one goes straight to an expert.
+  The photo measure underestimates pale powdery mildew and virus
+  mottling, which is why the grower's estimate is included.
+
 Data is stored with SQLAlchemy: SQLite at `instance/verdant.db` locally,
 Postgres in production via `DATABASE_URL`.
 

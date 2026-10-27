@@ -34,14 +34,17 @@ from backend.database.models import TreatmentCase, TreatmentStep
 from backend.prediction.predictor import get_predictor
 from backend.routes.auth_routes import current_user, login_required
 from backend.routes.upload_utils import UploadError, saved_image_upload
+from backend.prediction.severity import measure_severity
 from backend.services.analysis_service import analyze_upload
 from backend.services.checkin_note_service import review_note
+from backend.services.severity_service import assess, clean_extent, clean_photo_severity
 from backend.services.languages import normalise_language
 from backend.services.tracking_service import (
     TrackingRequestError,
     case_to_dict,
     check_in,
     ensure_can_check_in,
+    latest_severity,
     make_thumbnail,
     new_case,
     plan_preview,
@@ -96,6 +99,14 @@ def _own_case(case_id: int) -> TreatmentCase | None:
     return case
 
 
+def _photo_severity(filepath: str) -> dict | None:
+    try:
+        return measure_severity(filepath).to_dict()
+    except Exception:
+        logger.exception("Severity measurement failed")
+        return None
+
+
 def _jpeg(data: bytes | None):
     if not data:
         return _error("No photo.", "NOT_FOUND", 404)
@@ -120,7 +131,13 @@ def treatment_plan():
     except TrackingRequestError as exc:
         return _error(str(exc), exc.code, exc.http_status)
 
-    return jsonify({**plan_preview(fields), "meta": plan_meta()}), 200
+    preview = plan_preview(
+        fields,
+        clean_photo_severity(payload.get("photo_severity")),
+        clean_extent(payload.get("extent")),
+    )
+
+    return jsonify({**preview, "meta": plan_meta()}), 200
 
 
 @tracking_bp.route("/cases", methods=["GET"])
@@ -144,6 +161,11 @@ def create_case():
 
         with saved_image_upload() as filepath:
             photo = make_thumbnail(filepath)
+            severity = assess(
+                fields["predicted_class"],
+                _photo_severity(filepath),
+                clean_extent(request.form.get("extent")),
+            )
 
     except TrackingRequestError as exc:
         return _error(str(exc), exc.code, exc.http_status)
@@ -152,7 +174,7 @@ def create_case():
         return exc.response
 
     db = db_session()
-    case = new_case(current_user().id, fields, photo)
+    case = new_case(current_user().id, fields, photo, severity)
     db.add(case)
     db.commit()
 
@@ -209,10 +231,13 @@ def case_check_in(case_id: int):
 
         followup = None
         photo = None
+        measured = None
+        extent = clean_extent(request.form.get("extent"))
 
         with saved_image_upload() if _has_file() else nullcontext() as filepath:
             if filepath:
                 photo = make_thumbnail(filepath)
+                measured = _photo_severity(filepath)
                 try:
                     followup = summarise_followup(analyze_upload(filepath, language))
                 except Exception:
@@ -221,8 +246,13 @@ def case_check_in(case_id: int):
                 followup["has_photo"] = True
 
         note_review = review_note(case, outcome, notes, language) if notes else None
+        severity = (
+            assess(case.predicted_class, measured, extent, latest_severity(case))
+            if measured or extent
+            else None
+        )
 
-        feedback = check_in(case, outcome, notes, followup, photo, note_review)
+        feedback = check_in(case, outcome, notes, followup, photo, note_review, severity)
 
     except TrackingRequestError as exc:
         return _error(str(exc), exc.code, exc.http_status)

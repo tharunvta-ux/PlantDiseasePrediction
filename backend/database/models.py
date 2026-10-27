@@ -73,6 +73,8 @@ class TreatmentCase(Base):
     display_name: Mapped[str] = mapped_column(String(200))
     confidence_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
     photo: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    # Severity / outlook when tracking started (severity_service.assess).
+    severity: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="cases")
     steps: Mapped[List["TreatmentStep"]] = relationship(
@@ -116,5 +118,7 @@ class TreatmentStep(Base):
     feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
     followup: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     followup_photo: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    # Severity, trend and outlook measured at this step's check-in.
+    severity: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     case: Mapped[TreatmentCase] = relationship(back_populates="steps")

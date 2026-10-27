@@ -791,6 +791,45 @@ img { max-width: 100%; display: block; }
 .match-card .treatment-meta { margin-top: 0.75rem; }
 .match-answer { margin-top: 1rem; font-size: 0.875rem; color: var(--muted-foreground); }
 
+.check-row { margin-top: 0.75rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
+.check-question { flex: 1 1 18rem; font-size: 0.9375rem; line-height: 1.45; }
+.check-buttons { display: flex; gap: 0.375rem; }
+.check-option, .extent-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: oklch(1 0 0 / 0.8);
+  padding: 0.375rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.check-option input, .extent-option input { accent-color: var(--primary); }
+.check-yes:has(input:checked), .extent-option:has(input:checked), .extent-option.selected { border-color: var(--primary); background: oklch(0.58 0.16 150 / 0.08); }
+.check-no:has(input:checked) { border-color: oklch(0.6 0.22 27 / 0.6); background: oklch(0.6 0.22 27 / 0.06); }
+
+.ask-expert { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.ask-expert summary { cursor: pointer; font-weight: 600; color: var(--primary); font-size: 0.875rem; }
+
+.severity-card { margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+.extent-options { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.severity-card .treatment-meta { margin-top: 0.625rem; }
+.severity-grade { margin-top: 0.625rem; font-weight: 600; font-size: 0.9375rem; }
+
+.outlook { margin-top: 0.75rem; border-radius: 0.875rem; padding: 0.75rem 1rem; font-size: 0.9375rem; font-weight: 500; line-height: 1.5; border: 1px solid transparent; }
+.outlook-good { border-color: oklch(0.58 0.16 150 / 0.3); background: oklch(0.58 0.16 150 / 0.08); color: oklch(0.38 0.12 150); }
+.outlook-fair { border-color: oklch(0.75 0.15 75 / 0.4); background: oklch(0.85 0.12 85 / 0.18); color: oklch(0.42 0.1 65); }
+.outlook-poor { border-color: oklch(0.6 0.22 27 / 0.3); background: oklch(0.6 0.22 27 / 0.06); color: oklch(0.5 0.2 27); }
+.case-card .outlook { margin-top: 1rem; }
+
+.chip.severity-mild, .chip.trend-improving { border-color: oklch(0.58 0.16 150 / 0.3); color: var(--primary); }
+.chip.severity-moderate, .chip.trend-same { border-color: oklch(0.75 0.15 75 / 0.4); color: oklch(0.45 0.1 65); }
+.chip.severity-severe, .chip.trend-worsening { border-color: oklch(0.6 0.22 27 / 0.3); color: oklch(0.55 0.2 27); }
+
+.photo-tip { font-size: 0.75rem; color: var(--muted-foreground); }
+
 .expert-links { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .expert-links .btn-primary, .expert-links .btn-outline { padding: 0.5rem 1rem; font-size: 0.8125rem; }
 

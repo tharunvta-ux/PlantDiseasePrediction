@@ -228,71 +228,157 @@
     if (fields) await loadPlan(analysis, fields);
   }
 
-  /* An AI-matched disease of a crop the disease model does not cover:
-   * TNAU products are only shown after the grower confirms the symptoms. */
+  /* An AI-matched disease of a crop the disease model does not cover.
+   * TNAU products are only shown after the grower confirms it:
+   * 1. "Is this a <crop> plant?" (growers know what they planted),
+   * 2. simple yes/no checks they can do by looking at / touching a leaf. */
   function askToConfirm(analysis) {
     const condition = analysis.ai_condition;
     const id = analysis.plant_identification || {};
     const plantName = id.plant_common_name || condition.crop;
 
     const ANSWERS = {
-      yes: "You said your plant looks like this.",
-      unsure: "You were not sure, so only safe care steps are shown first.",
-      no: "You said it does not look like this, so general care steps are shown.",
+      yes: "Your answers match this disease.",
+      unsure: "Your answers only partly match, so safe care steps come first.",
+      no: "Your answers do not match this disease, so general care steps are shown.",
+      wrong_crop: "You said this is not the plant the AI named, so general care steps are shown.",
     };
 
     function answer(choice) {
-      const fields =
-        choice === "no"
-          ? { predicted_class: "", confidence_level: "", plant_name: plantName, general_advice: id.general_advice || [] }
-          : { predicted_class: condition.id, confidence_level: choice === "yes" ? "high" : "uncertain", plant_name: plantName };
+      const general = choice === "no" || choice === "wrong_crop";
+      const fields = general
+        ? { predicted_class: "", confidence_level: "", plant_name: general && choice === "wrong_crop" ? "Plant" : plantName, general_advice: id.general_advice || [] }
+        : { predicted_class: condition.id, confidence_level: choice === "yes" ? "high" : "uncertain", plant_name: plantName };
 
       const intro = el("p", { class: "match-answer" }, [
         `${condition.display_name}: ${ANSWERS[choice]} `,
-        el("button", { type: "button", class: "link-button", text: "Change answer", onclick: () => askToConfirm(analysis) }),
+        el("button", { type: "button", class: "link-button", text: "Change answers", onclick: () => askToConfirm(analysis) }),
       ]);
 
       loadPlan(analysis, fields, intro);
     }
 
-    const button = (choice, text, cls) =>
-      el("button", { type: "button", class: `${cls} btn-pill`, text, onclick: () => answer(choice) });
+    const askExpert = el("details", { class: "ask-expert" }, [
+      el("summary", { text: "Not sure? Ask an expert first" }),
+      el("p", { class: "treatment-meta", text: "An expert can confirm the disease from the plant or a photo before you spend money on any treatment." }),
+      expertLinks(),
+    ]);
+
+    function symptomChecks() {
+      const answers = condition.checks.map(() => null);
+      const showPlan = el("button", { type: "button", class: "btn-primary btn-pill", text: "Show what to do" });
+
+      const rows = condition.checks.map((question, index) =>
+        el("div", { class: "check-row" }, [
+          el("p", { class: "check-question", text: question }),
+          el("div", { class: "check-buttons", role: "radiogroup" }, ["yes", "no"].map((value) =>
+            el("label", { class: `check-option check-${value}` }, [
+              el("input", { type: "radio", name: `check-${index}`, value, onchange: () => { answers[index] = value; } }),
+              el("span", { text: value === "yes" ? "Yes" : "No" }),
+            ])
+          )),
+        ])
+      );
+
+      showPlan.addEventListener("click", () => {
+        const yes = answers.filter((a) => a === "yes").length;
+        const no = answers.filter((a) => a === "no").length;
+        // All yes confirms; any yes (or unanswered) is "not sure"; all no rules it out.
+        answer(yes === answers.length ? "yes" : no === answers.length ? "no" : "unsure");
+      });
+
+      planStep.replaceChildren(
+        el("div", { class: "match-card" }, [
+          el("p", { class: "result-eyebrow", text: "Possible match found by AI" }),
+          el("h4", { class: "step-title", text: condition.display_name }),
+          el("p", { class: "checkin-question", text: "Look closely at the plant and answer:" }),
+          ...rows,
+          el("p", { class: "treatment-meta", text: "Skip a question if you cannot tell." }),
+          el("div", { class: "match-buttons" }, [showPlan]),
+          el("p", { class: "treatment-meta" }, [
+            "Compare with ",
+            el("a", { href: condition.source_url, target: "_blank", rel: "noopener", class: "inline-link", text: "TNAU's page with photos" }),
+            ".",
+          ]),
+          askExpert,
+        ])
+      );
+    }
 
     lastPlan = null;
     planStep.replaceChildren(
       el("div", { class: "match-card" }, [
         el("p", { class: "result-eyebrow", text: "Possible match found by AI" }),
         el("h4", { class: "step-title", text: condition.display_name }),
-        el("p", { class: "step-reason", text: "How TNAU describes it:" }),
-        el("p", { class: "match-symptoms", text: condition.symptoms }),
-        el("p", { class: "checkin-question", text: "Does your plant look like this?" }),
+        el("p", { class: "checkin-question", text: `First: is this a ${condition.crop.toLowerCase()} plant?` }),
         el("div", { class: "match-buttons" }, [
-          button("yes", "Yes, it looks like this", "btn-primary"),
-          button("unsure", "Not sure", "btn-outline"),
-          button("no", "No", "btn-outline"),
+          el("button", { type: "button", class: "btn-primary btn-pill", text: `Yes, it is ${condition.crop.toLowerCase()}`, onclick: symptomChecks }),
+          el("button", { type: "button", class: "btn-outline btn-pill", text: "No", onclick: () => answer("wrong_crop") }),
         ]),
-        el("p", { class: "treatment-meta" }, [
-          condition.has_products ? "TNAU lists a treatment for this; it is shown after you confirm. " : "",
-          el("a", { href: condition.source_url, target: "_blank", rel: "noopener", class: "inline-link", text: "TNAU page with photos" }),
-        ]),
+        el("p", { class: "treatment-meta", text: condition.has_products ? "TNAU lists a treatment for this; it is shown once your answers match." : "" }),
       ])
     );
     planActions.classList.add("hidden");
     planPanel.classList.remove("hidden");
   }
 
-  async function loadPlan(analysis, fields, intro = null) {
+  const EXTENTS = [
+    ["few_leaves", "A few leaves"],
+    ["about_half", "About half the plant"],
+    ["most", "Most of the plant"],
+  ];
+  const OUTLOOK_ICON = { good: "🟢", fair: "🟡", poor: "🔴" };
+  const TREND_TEXT = { improving: "↓ Improving", same: "→ About the same", worsening: "↑ Getting worse" };
+
+  function outlookBox(outlook) {
+    return outlook
+      ? el("p", { class: `outlook outlook-${outlook.level}`, text: `${OUTLOOK_ICON[outlook.level] || ""} ${outlook.text}` })
+      : null;
+  }
+
+  function severityText(severity) {
+    if (!severity || !severity.grade) return "";
+    const grade = severity.grade[0].toUpperCase() + severity.grade.slice(1);
+    return severity.affected_percent != null ? `${grade} (about ${Math.round(severity.affected_percent)}% of the leaf)` : grade;
+  }
+
+  // "How much of the plant has this?" + photo measurement + outlook.
+  function severityCard(severity, photo, onExtent, selected) {
+    return el("div", { class: "severity-card" }, [
+      el("p", { class: "checkin-question", text: "How much of the plant has this?" }),
+      el("div", { class: "extent-options" }, EXTENTS.map(([value, label]) =>
+        el("button", {
+          type: "button",
+          class: `extent-option${selected === value ? " selected" : ""}`,
+          "aria-pressed": selected === value ? "true" : "false",
+          text: label,
+          onclick: () => onExtent(value),
+        })
+      )),
+      photo && photo.reliable
+        ? el("p", { class: "treatment-meta", text: `Photo check: about ${Math.round(photo.affected_percent)}% of the visible leaf area looks affected (approximate).` })
+        : null,
+      severity && severity.grade ? el("p", { class: "severity-grade", text: `Severity: ${severityText(severity)}` }) : null,
+      outlookBox(severity && severity.outlook),
+    ]);
+  }
+
+  async function loadPlan(analysis, fields, intro = null, extent = null) {
     let data;
     try {
-      data = await postJson("/treatment-plan", fields);
+      data = await postJson("/treatment-plan", { ...fields, photo_severity: analysis.photo_severity || null, extent });
     } catch (_) {
       return; // the rest of the result is still useful without a plan
     }
 
     if (analysis !== lastAnalysis || !data.trackable || !data.step) return;
 
-    lastPlan = { fields, step: data.step };
-    planStep.replaceChildren(...[intro, stepBody(data.step)].filter(Boolean));
+    lastPlan = { fields, step: data.step, extent };
+    planStep.replaceChildren(...[
+      intro,
+      stepBody(data.step),
+      severityCard(data.severity, analysis.photo_severity, (value) => loadPlan(analysis, fields, intro, value), extent),
+    ].filter(Boolean));
     planActions.classList.remove("hidden");
 
     const meta = data.meta || {};
@@ -323,6 +409,7 @@
     Object.entries(lastPlan.fields).forEach(([key, value]) =>
       form.append(key, Array.isArray(value) ? JSON.stringify(value) : value)
     );
+    if (lastPlan.extent) form.append("extent", lastPlan.extent);
 
     try {
       await api("/cases", { method: "POST", body: form });
@@ -377,6 +464,7 @@
     const notes = el("textarea", { name: "notes", rows: "2", maxlength: "1000", placeholder: "e.g. new spots on the top leaves, or the spots are drying up" });
     const photo = el("input", { type: "file", name: "file", accept: "image/jpeg,image/png", capture: "environment" });
     const info = dueInfo(step);
+    const extentName = `extent-${c.id}`;
 
     const form = el("form", { class: "checkin-form", novalidate: true }, [
       el("p", { class: "checkin-question", text: step.check_question || "Did it work?" }),
@@ -397,9 +485,16 @@
         el("span", { text: "What do you see? (optional: the app replies to your note)" }),
         notes,
       ]),
+      el("div", { class: "field" }, [
+        el("span", { text: "How much of the plant has it now? (optional)" }),
+        el("div", { class: "extent-options", role: "radiogroup" }, EXTENTS.map(([value, label]) =>
+          el("label", { class: "extent-option" }, [el("input", { type: "radio", name: extentName, value }), el("span", { text: label })])
+        )),
+      ]),
       el("label", { class: "field" }, [
-        el("span", { text: "New photo (optional, recommended if it did not work: the app re-checks the diagnosis)" }),
+        el("span", { text: "New photo (recommended: the app measures whether the disease is shrinking and re-checks the diagnosis)" }),
         photo,
+        el("span", { class: "photo-tip", text: "Tip: photograph the same plant from about the same distance as last time." }),
       ]),
       error,
       submit,
@@ -427,6 +522,8 @@
       body.append("outcome", choice.value);
       body.append("notes", notes.value);
       body.append("language", language());
+      const extent = form.querySelector(`input[name="${extentName}"]:checked`);
+      if (extent) body.append("extent", extent.value);
       if (file) body.append("file", file);
 
       submit.disabled = true;
@@ -470,6 +567,12 @@
             ? el("p", { class: "timeline-text", text: `Products suggested: ${s.products.map((p) => p.name).join(" or ")}` })
             : null,
           s.notes ? el("p", { class: "timeline-text", text: `Your notes: ${s.notes}` }) : null,
+          s.severity && s.severity.grade
+            ? el("p", { class: "timeline-text" }, [
+                `Severity: ${severityText(s.severity)}`,
+                s.severity.trend ? ` — ${TREND_TEXT[s.severity.trend.direction]} (${s.severity.trend.text})` : "",
+              ])
+            : null,
           f && f.display_name
             ? el("p", { class: "timeline-text", text: `New photo: ${f.display_name} (${LEVEL[f.confidence_level] || f.confidence_level || "unclear"})` })
             : null,
@@ -498,6 +601,9 @@
     const step = c.current_step;
     const info = c.awaiting_check_in ? dueInfo(step) : null;
     const feedback = latestFeedback(c);
+    const severity = c.latest_severity;
+    const outlook = c.status === "recovered" ? null : (severity || c.severity || {}).outlook;
+    const trend = severity && severity.trend;
 
     return el("article", { class: `case-card glass${isDue(c) ? " case-due" : ""}`, id: `case-${c.id}` }, [
       el("div", { class: "case-head" }, [
@@ -511,9 +617,14 @@
           el("div", { class: "result-chips" }, [
             el("span", { class: `chip ${statusClass}`, text: statusText }),
             info ? el("span", { class: `chip ${info.due ? "chip-diseased" : ""}`, text: info.text }) : null,
+            severity && severity.grade
+              ? el("span", { class: `chip severity-${severity.grade}`, text: `Severity: ${severityText(severity)}` })
+              : null,
+            trend ? el("span", { class: `chip trend-${trend.direction}`, text: TREND_TEXT[trend.direction] }) : null,
           ]),
         ]),
       ]),
+      outlookBox(outlook),
       feedback && feedback.text
         ? el("p", { class: `case-feedback${feedback.positive ? " positive" : ""}`, text: feedback.text })
         : null,

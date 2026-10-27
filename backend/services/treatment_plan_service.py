@@ -120,6 +120,9 @@ def ai_condition_summary(key: str) -> Dict[str, Any]:
         "disease": info.condition,
         "display_name": info.display_name,
         "symptoms": entry["symptoms"],
+        # Yes/no questions a grower can answer by looking at / touching
+        # the leaf; all "yes" confirms the match.
+        "checks": entry["checks"],
         "source_url": entry["source_url"],
         "has_products": bool(entry["products"]),
     }

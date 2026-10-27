@@ -37,7 +37,9 @@ from backend.database.models import (
 )
 from backend.prediction.class_info import parse_class_name
 from backend.prediction.confidence import LEVEL_HIGH, LEVEL_UNCERTAIN
+from backend.prediction.severity import GRADE_SEVERE
 from backend.services.recommendation_service import DOSAGE_PATTERN
+from backend.services.severity_service import TREND_IMPROVING, TREND_WORSENING, assess
 from backend.services.treatment_plan_service import (
     KIND_EXPERT,
     StepPlan,
@@ -52,6 +54,10 @@ logger = logging.getLogger(__name__)
 
 # Hard stop, also when re-analysis keeps finding different diseases.
 MAX_CASE_STEPS = 6
+
+# Title of a repeated step when the photo shows the disease shrinking;
+# a step is only repeated once.
+CONTINUE_TITLE = "Keep going - the disease is shrinking"
 
 THUMBNAIL_SIDE = 640
 THUMBNAIL_QUALITY = 80
@@ -209,7 +215,12 @@ def add_step(case: TreatmentCase, plan: StepPlan) -> TreatmentStep:
     return step
 
 
-def new_case(user_id: int, request: Dict[str, Any], photo: bytes) -> TreatmentCase:
+def new_case(
+    user_id: int,
+    request: Dict[str, Any],
+    photo: bytes,
+    severity: Dict[str, Any] | None = None,
+) -> TreatmentCase:
     """Case with its first step (not yet added to a session)."""
 
     case = TreatmentCase(
@@ -220,6 +231,7 @@ def new_case(user_id: int, request: Dict[str, Any], photo: bytes) -> TreatmentCa
         display_name=request["display_name"],
         confidence_level=request["confidence_level"],
         photo=photo,
+        severity=severity,
     )
 
     add_step(case, first_step(request["predicted_class"], request["confidence_level"], request["ai_advice"]))
@@ -320,6 +332,35 @@ def _apply_followup(case: TreatmentCase, followup: Dict[str, Any] | None) -> tup
     return [], None
 
 
+def latest_severity(case: TreatmentCase) -> Dict[str, Any] | None:
+    """Most recent severity with a grade (check-ins first, then the start)."""
+
+    for step in reversed(case.steps):
+        if step.severity and step.severity.get("grade"):
+            return step.severity
+
+    return case.severity if case.severity and case.severity.get("grade") else None
+
+
+def continue_step(step: TreatmentStep, change: Dict[str, Any]) -> StepPlan:
+    """Same step again, a little longer - the disease is already shrinking."""
+
+    return StepPlan(
+        kind=step.kind,
+        title=CONTINUE_TITLE,
+        actions=list(step.actions or []),
+        products=list(step.products or []),
+        wait_days=max(3, (step.wait_days or 6) // 2),
+        check_question=step.check_question,
+        reason=(
+            f"The new photo shows less disease than before ({change['text']}). The "
+            "treatment may be working slowly, so keep going a few more days before "
+            "changing anything."
+        ),
+        source_url=step.source_url,
+    )
+
+
 def worked_message(case: TreatmentCase, followup: Dict[str, Any] | None) -> str:
     step = case.current_step
     if step is not None and step.kind == KIND_EXPERT:
@@ -360,12 +401,16 @@ def check_in(
     followup: Dict[str, Any] | None = None,
     followup_photo: bytes | None = None,
     note_review: Dict[str, Any] | None = None,
+    severity: Dict[str, Any] | None = None,
 ) -> str:
     """
     Record the answer for the current step and decide what comes next.
 
     `note_review` is the AI reply to the grower's note (see
     checkin_note_service); an urgent note sends the case to an expert.
+    `severity` (severity_service.assess, with the trend since the last
+    measurement) can keep a slowly working step going, or escalate a
+    fast-spreading severe problem.
 
     Returns:
         The feedback message (also stored on the step).
@@ -375,15 +420,26 @@ def check_in(
     step = case.current_step
     reply = (note_review or {}).get("reply")
     urgent = bool((note_review or {}).get("urgent"))
+    change = (severity or {}).get("trend") or {}
+    direction = change.get("direction")
 
     step.outcome = outcome
     step.outcome_at = utcnow()
     step.notes = notes
     step.followup = followup
     step.followup_photo = followup_photo
+    step.severity = severity
 
     if outcome == OUTCOME_WORKED:
-        feedback = " ".join(filter(None, [worked_message(case, followup), reply]))
+        trend_note = None
+        if direction == TREND_IMPROVING:
+            trend_note = f"The photo agrees: {change['text']}."
+        elif direction == TREND_WORSENING:
+            trend_note = (
+                f"Note: the photo shows more disease than before ({change['text']}). "
+                "Watch the plant closely and start a new check if it spreads."
+            )
+        feedback = " ".join(filter(None, [worked_message(case, followup), trend_note, reply]))
         case.status = CASE_RECOVERED
         step.feedback = feedback
         return feedback
@@ -397,6 +453,23 @@ def check_in(
             "What you describe sounds serious, so please do not wait for another "
             "step - contact an agricultural expert now."
         )
+    elif (
+        direction == TREND_WORSENING
+        and (severity or {}).get("grade") == GRADE_SEVERE
+        and step.kind != KIND_EXPERT
+    ):
+        plan = expert_step(
+            f"The disease is spreading fast ({change['text']}). Please contact an "
+            "agricultural expert now instead of trying another step."
+        )
+    elif (
+        plan is None
+        and direction == TREND_IMPROVING
+        and step.kind != KIND_EXPERT
+        and step.title != CONTINUE_TITLE
+        and len(case.steps) < MAX_CASE_STEPS
+    ):
+        plan = continue_step(step, change)
     elif len(case.steps) >= MAX_CASE_STEPS:
         plan = expert_step(
             "Several steps have been tried without success. An expert can examine "
@@ -444,6 +517,7 @@ def step_to_dict(step: TreatmentStep, case_id: int) -> Dict[str, Any]:
         "notes": step.notes,
         "feedback": step.feedback,
         "followup": followup,
+        "severity": step.severity,
         "followup_photo_url": (
             f"/cases/{case_id}/steps/{step.id}/photo"
             if followup and followup.get("has_photo")
@@ -473,6 +547,8 @@ def case_to_dict(case: TreatmentCase) -> Dict[str, Any]:
         "created_at": iso(case.created_at),
         "updated_at": iso(case.updated_at),
         "photo_url": f"/cases/{case.id}/photo",
+        "severity": case.severity,
+        "latest_severity": latest_severity(case),
         "current_step": current,
         "awaiting_check_in": bool(
             current and current["outcome"] == OUTCOME_PENDING and case.status != CASE_RECOVERED
@@ -481,8 +557,12 @@ def case_to_dict(case: TreatmentCase) -> Dict[str, Any]:
     }
 
 
-def plan_preview(request: Dict[str, Any]) -> Dict[str, Any]:
-    """First step for a diagnosis, without saving anything."""
+def plan_preview(
+    request: Dict[str, Any],
+    photo_severity: Dict[str, Any] | None = None,
+    extent: str | None = None,
+) -> Dict[str, Any]:
+    """First step, severity and outlook for a diagnosis, without saving."""
 
     trackable = is_trackable(request["predicted_class"], request["confidence_level"])
 
@@ -493,4 +573,5 @@ def plan_preview(request: Dict[str, Any]) -> Dict[str, Any]:
             if trackable
             else None
         ),
+        "severity": assess(request["predicted_class"], photo_severity, extent) if trackable else None,
     }

@@ -11,8 +11,8 @@ import logging
 from pathlib import Path
 
 from flask import Flask, current_app, g
-from sqlalchemy import create_engine
-from sqlalchemy.engine import make_url
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -44,11 +44,44 @@ def init_db(app: Flask, database_url: str) -> None:
 
     engine = create_engine(url, **options)
     Base.metadata.create_all(engine)
+    add_missing_columns(engine)
 
     app.extensions[EXTENSION_KEY] = sessionmaker(engine, expire_on_commit=False)
     app.teardown_appcontext(_close_session)
 
     logger.info("Database ready (%s)", url.get_backend_name())
+
+
+def add_missing_columns(engine: Engine) -> None:
+    """
+    Add nullable columns that newer code defines but an existing database
+    lacks (create_all only creates missing tables). A minimal stand-in for
+    migrations: only ever adds nullable columns, never changes or drops.
+    """
+
+    inspector = inspect(engine)
+
+    with engine.begin() as connection:
+        for table in Base.metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue
+
+            existing = {column["name"] for column in inspector.get_columns(table.name)}
+
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+                if not column.nullable:
+                    raise RuntimeError(
+                        f"Column {table.name}.{column.name} is missing and not nullable; "
+                        "add it with a real migration."
+                    )
+
+                column_type = column.type.compile(dialect=engine.dialect)
+                connection.execute(
+                    text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {column_type}')
+                )
+                logger.info("Added column %s.%s", table.name, column.name)
 
 
 def db_session() -> Session:

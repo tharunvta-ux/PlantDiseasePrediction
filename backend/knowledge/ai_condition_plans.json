@@ -21,6 +21,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/papaya_diseases_2.html",
       "pathogen_type": "fungal",
       "symptoms": "White powdery growth on the upper side of leaves, flower stalks and fruit; severe attack makes leaves yellow and drop.",
+      "checks": ["Is there a white powder on the leaves that rubs off on your finger?", "Is it mostly on the top side of the leaves?", "Are some leaves turning yellow or falling?"],
       "care": ["Remove badly affected leaves and destroy them.", "Give plants enough spacing for air movement."],
       "products": [
         {"name": "Wettable sulphur", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M02"}
@@ -31,6 +32,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/papaya_diseases_3.html",
       "pathogen_type": "viral",
       "symptoms": "Vein clearing, puckering and mottled, distorted leaves; circular concentric rings on the fruit.",
+      "checks": ["Are the leaves mottled light and dark green, puckered or misshapen?", "Do the fruits have round rings on the skin?"],
       "care": [
         "Uproot affected plants immediately - virus-infected plants do not recover.",
         "Do not grow cucurbits (pumpkin, gourds, cucumber) around the field.",
@@ -43,6 +45,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/papaya_diseases_4.html",
       "pathogen_type": "viral",
       "symptoms": "Leaves curl, crinkle and roll inward and downward, become small and brittle; plants are stunted with no flowers or fruit.",
+      "checks": ["Are the leaves curled, crinkled and rolled downwards?", "Are the new leaves much smaller than normal?", "Is the plant stunted, with few or no flowers or fruit?"],
       "care": [
         "Uproot affected plants - infected plants do not recover.",
         "Do not grow tomato or tobacco near papaya (they share the virus).",
@@ -55,6 +58,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/banana_diseases/crop_prot_crop%20diseases_fruits_banana_8.html",
       "pathogen_type": "fungal",
       "symptoms": "Oval leaf spots with light grey centres and a yellow halo that merge into large dried patches; leaves dry quickly.",
+      "checks": ["Are there oval spots with a grey centre and a yellow border?", "Do the spots join into large dried patches?", "Are the older leaves drying faster than normal?"],
       "care": [
         "Remove and destroy affected leaves.",
         "Keep the field weed-free and remove extra suckers on time.",
@@ -72,6 +76,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/banana_diseases/crop_prot_crop%20diseases_fruits_banana_3.html",
       "pathogen_type": "viral",
       "symptoms": "Dark green streaks along the leaf veins and midrib; new leaves are short, narrow and bunched at the top of the plant.",
+      "checks": ["Do the new leaves come out short, narrow and bunched together at the top?", "Are there dark green streaks along the leaf veins or the midrib?"],
       "care": [
         "Uproot and destroy infected plants (with their suckers) - they do not recover.",
         "Keep the field clean and weed-free so new infections are seen early.",
@@ -84,6 +89,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/mango_2.html",
       "pathogen_type": "fungal",
       "symptoms": "White powdery growth on flowers, young leaves and small fruit; infected leaves and pea-sized fruit drop.",
+      "checks": ["Is there a white powder on the flowers, young leaves or small fruit?", "Are flowers or small fruits dropping?"],
       "care": [
         "Remove and destroy badly affected flower panicles and leaves.",
         "TNAU: first spray soon after flowering and a second one 15 days later."
@@ -98,6 +104,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/mango_5.html",
       "pathogen_type": "algal",
       "symptoms": "Rusty red, slightly raised circular spots on leaves and young twigs that join into irregular patches.",
+      "checks": ["Are there rusty red, slightly raised round spots on the leaves?", "Do the spots feel slightly rough when you touch them?"],
       "care": ["Prune out badly affected twigs.", "Prune to let light and air into the canopy."],
       "products": [
         {"name": "Copper oxychloride", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M01"},
@@ -109,6 +116,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/mango_1.html",
       "pathogen_type": "fungal",
       "symptoms": "Small blister-like dark spots on leaves and twigs; young leaves and tender twigs wither and die back; black spots on fruit.",
+      "checks": ["Are there dark brown or black spots on the leaves or young twigs?", "Are young leaves or twig tips drying and dying back?", "Are there black spots on the fruit?"],
       "care": [
         "Prune out dead twigs and remove fallen infected leaves.",
         "For fruit: TNAU recommends a hot-water dip (50-55°C for 15 minutes) before storage."
@@ -122,6 +130,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/brinjal_diseases_2.html",
       "pathogen_type": "fungal",
       "symptoms": "Yellowish angular to irregular leaf spots that turn greyish-brown; badly affected leaves drop early.",
+      "checks": ["Are there angular or irregular spots that start yellowish and turn grey-brown?", "Are badly spotted leaves falling early?"],
       "care": ["Remove and destroy affected leaves.", "TNAU: the variety Pant Samrat resists both brinjal leaf spots."],
       "products": [
         {"name": "Copper oxychloride", "dose": "2 g per litre of water", "kind": "fungicide", "group": "FRAC M01"},
@@ -134,6 +143,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/brinjal_diseases_3.html",
       "pathogen_type": "fungal",
       "symptoms": "Irregular brown leaf spots 4-8 mm wide, often with rings, that join to cover large parts of the leaf.",
+      "checks": ["Are there brown leaf spots with rings inside, like a target?", "Do the spots join to cover large parts of the leaf?"],
       "care": ["Remove and destroy affected leaves.", "Water at the base of the plant, not over the leaves."],
       "products": [
         {"name": "Mancozeb", "dose": "2 g per litre of water", "kind": "fungicide", "group": "FRAC M03"},
@@ -145,6 +155,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/chilli_diseases_2.html",
       "pathogen_type": "fungal",
       "symptoms": "Tender twigs dry from the tip backwards (die-back); sunken, dark spots and rot on the fruit.",
+      "checks": ["Are twigs drying from the tip backwards?", "Are there sunken dark spots or rotting patches on the fruit?"],
       "care": [
         "Cut out dried twigs and remove rotting fruit.",
         "Next crop: use disease-free seed (TNAU: seed treatment with captan 4 g per kg of seed).",
@@ -161,6 +172,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/chilli_diseases_3.html",
       "pathogen_type": "fungal",
       "symptoms": "White powdery growth on the underside of leaves; leaves drop.",
+      "checks": ["Is there a white powder on the UNDERSIDE of the leaves?", "Are leaves falling off?"],
       "care": ["Remove badly affected leaves.", "TNAU: three sprays at 15-day intervals from the first symptoms."],
       "products": [
         {"name": "Wettable sulphur", "dose": "3 g per litre of water", "kind": "fungicide", "group": "FRAC M02"},
@@ -172,6 +184,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/chilli_diseases_5.html",
       "pathogen_type": "fungal",
       "symptoms": "Brown circular leaf spots with light grey centres and dark brown margins; badly infected leaves fall early.",
+      "checks": ["Are there round brown spots with a light grey centre and a dark brown border?", "Are badly spotted leaves falling early?"],
       "care": ["Remove and destroy affected leaves.", "TNAU: spray twice at 10-15 day intervals."],
       "products": [
         {"name": "Mancozeb", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M03"},
@@ -183,6 +196,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/chilli_diseases_7.html",
       "pathogen_type": "viral",
       "symptoms": "Leaves curl towards the midrib and become deformed; plants are stunted and flower buds drop.",
+      "checks": ["Are the leaves curling up towards the middle vein and misshapen?", "Is the plant stunted, with flower buds dropping?"],
       "care": [
         "Uproot and destroy infected plants - they do not recover.",
         "Grow 2-3 rows of maize or sorghum around the field to limit insects that spread the virus.",
@@ -198,6 +212,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/rice_diseases/rice_1.html",
       "pathogen_type": "fungal",
       "symptoms": "Spindle-shaped leaf spots with grey centres and dark brown edges (starting as small bluish-green flecks) that can merge and dry the leaf.",
+      "checks": ["Are there spindle- or eye-shaped spots with a grey centre and a brown border?", "Are the spots pointed at both ends?"],
       "care": [
         "Remove weed hosts from bunds and channels.",
         "Avoid excess nitrogen fertiliser.",
@@ -214,6 +229,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/rice_diseases/rice_2.html",
       "pathogen_type": "fungal",
       "symptoms": "Oval, dark brown spots with a yellow halo on the leaves (like sesame seeds); spots join and the leaf dries.",
+      "checks": ["Are there small oval dark brown spots, like sesame seeds, with a yellow ring?", "Are there many such spots spread over the leaf?"],
       "care": [
         "Remove infected debris and weed hosts from the field.",
         "Use slow-release nitrogen fertiliser.",
@@ -228,6 +244,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/rice_diseases/rice_5.html",
       "pathogen_type": "fungal",
       "symptoms": "Greyish-brown spots on the uppermost leaf sheath around the young panicle; the panicle rots or does not emerge fully.",
+      "checks": ["Is the top leaf sheath (around the young panicle) showing grey-brown patches?", "Are panicles not coming out fully, or rotting inside?"],
       "care": [
         "TNAU: apply gypsum 200 kg per acre in two splits.",
         "Botanical option: spray neem oil 3% at boot leaf stage and 15 days later.",
@@ -243,6 +260,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/coconut_diseases_3.html",
       "pathogen_type": "fungal",
       "symptoms": "Leaflets dry from the tip downwards and look charred or burnt.",
+      "checks": ["Are the leaflets drying from the tip downwards?", "Do the dry parts look burnt or charred?"],
       "care": [
         "Remove and destroy severely affected leaves.",
         "TNAU: apply 200 g Pseudomonas fluorescens with 50 kg farmyard manure and 5 kg neem cake per palm per year.",
@@ -258,6 +276,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/coconut_diseases_2.html",
       "pathogen_type": "oomycete",
       "symptoms": "The youngest one or two leaves turn yellow and droop; the crown rots into a foul-smelling mass, mostly in the monsoon.",
+      "checks": ["Have the youngest one or two central leaves turned yellow or drooped?", "Is there a bad smell or rotting at the top (crown) of the palm?"],
       "care": [
         "Act quickly - bud rot kills the palm. TNAU: remove all affected tissue from the crown, then drench the crown and cover the cut area with Bordeaux paste, protected from rain.",
         "Spray the crowns of neighbouring palms as a precaution.",
@@ -273,6 +292,7 @@
       "source_url": "https://agritech.tnau.ac.in/crop_protection/groundnut_diseases/groundnut_d3.html",
       "pathogen_type": "fungal",
       "symptoms": "Orange-brown pustules, first on the underside of the leaves; badly infected leaves dry up but stay on the plant.",
+      "checks": ["Are there small orange-brown raised dots, mainly on the UNDERSIDE of the leaves?", "Does a rusty powder come off on your finger when you rub them?"],
       "care": ["Remove volunteer groundnut plants and crop debris.", "TNAU: repeat the spray 15 days later if needed."],
       "products": [
         {"name": "Mancozeb", "dose": "1000 g per hectare", "kind": "fungicide", "group": "FRAC M03"},

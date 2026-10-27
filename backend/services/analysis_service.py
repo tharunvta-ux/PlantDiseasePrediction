@@ -39,6 +39,7 @@ import numpy as np
 
 from backend.prediction.class_info import parse_class_name
 from backend.prediction.confidence import LEVEL_HIGH, LEVEL_LOW, LEVEL_UNCERTAIN
+from backend.prediction.severity import measure_severity
 from backend.services.languages import DEFAULT_LANGUAGE
 from backend.services.llm import LLMError
 from backend.services.plant_identification_service import NOT_SUPPORTED, identify_plant
@@ -266,6 +267,12 @@ def analyze_upload(image_path: str, language: str = DEFAULT_LANGUAGE) -> Dict[st
         error = exc
 
     result = combine_results(run, identification, error)
+
+    try:
+        result["photo_severity"] = measure_severity(image_path).to_dict()
+    except Exception:
+        logger.exception("Severity measurement failed")
+        result["photo_severity"] = None
 
     logger.info("Analysis route=%s diagnosis=%s", result["route"],
                 result["diagnosis"]["predicted_class"] if result["diagnosis"] else None)
