@@ -606,6 +606,7 @@
     const trend = severity && severity.trend;
 
     return el("article", { class: `case-card glass${isDue(c) ? " case-due" : ""}`, id: `case-${c.id}` }, [
+      isDue(c) ? el("p", { class: "due-ribbon", text: `⏰ ${info.text} - answer below` }) : null,
       el("div", { class: "case-head" }, [
         el("img", { class: "case-photo", src: c.photo_url, alt: `Photo of ${c.plant_name}`, loading: "lazy" }),
         el("div", { class: "case-info" }, [
@@ -646,12 +647,31 @@
     historySignedOut.classList.toggle("hidden", Boolean(user));
     historySignedIn.classList.toggle("hidden", !user);
 
-    const due = user ? cases.filter(isDue).length : 0;
+    const dueCases = user ? cases.filter(isDue) : [];
+    const due = dueCases.length;
+    const dueTitle = due ? `${plural(due, "check")} due: ${dueCases.map((c) => c.display_name).join(", ")}` : "";
+
     dueCounts.forEach((badge) => {
       badge.textContent = String(due);
+      badge.title = dueTitle;
       badge.classList.toggle("hidden", due === 0);
     });
-    dueBanner.textContent = `${plural(due, "check")} due. Tell us whether the treatment worked so the next step can be suggested.`;
+
+    // The badge's link goes straight to the (first) case that needs a check.
+    document.querySelectorAll('a[href^="#history"], a[href^="#case-"]').forEach((link) => {
+      if (link.closest(".nav-links, .nav-actions")) {
+        link.setAttribute("href", due ? `#case-${dueCases[0].id}` : "#history");
+        link.title = dueTitle;
+      }
+    });
+
+    dueBanner.replaceChildren(
+      `${plural(due, "check")} due - tell us whether the treatment worked: `,
+      ...dueCases.flatMap((c, index) => [
+        index ? ", " : "",
+        el("a", { href: `#case-${c.id}`, class: "inline-link", text: c.display_name, onclick: (event) => focusCase(event, c.id) }),
+      ]),
+    );
     dueBanner.classList.toggle("hidden", due === 0);
 
     if (!user) {
@@ -660,8 +680,26 @@
     }
 
     historyEmpty.classList.toggle("hidden", cases.length > 0);
-    caseList.replaceChildren(...cases.map(caseCard));
+    // Cases waiting for a check first, then the rest (newest first).
+    const ordered = [...dueCases, ...cases.filter((c) => !isDue(c))];
+    caseList.replaceChildren(...ordered.map(caseCard));
   }
+
+  function focusCase(event, id) {
+    const card = $(`case-${id}`);
+    if (!card) return;
+    if (event) event.preventDefault();
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+    card.classList.remove("case-flash");
+    void card.offsetWidth; // restart the animation
+    card.classList.add("case-flash");
+  }
+
+  // Following the nav badge link (#case-<id>) also highlights the card.
+  window.addEventListener("hashchange", () => {
+    const match = location.hash.match(/^#case-(\d+)$/);
+    if (match) focusCase(null, match[1]);
+  });
 
   async function loadCases() {
     if (!user) {

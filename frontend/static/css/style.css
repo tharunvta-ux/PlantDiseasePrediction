@@ -840,7 +840,22 @@ img { max-width: 100%; display: block; }
 
 .case-list { display: flex; flex-direction: column; gap: 1.25rem; }
 .case-card { border-radius: 1.5rem; padding: 1.25rem; box-shadow: var(--shadow-soft); scroll-margin-top: 6rem; }
-.case-card.case-due { border-color: oklch(0.6 0.22 27 / 0.35); }
+.case-card.case-due { border: 2px solid oklch(0.6 0.22 27 / 0.5); }
+.due-ribbon {
+  margin: -0.25rem 0 0.875rem;
+  display: inline-block;
+  border-radius: 999px;
+  background: oklch(0.6 0.22 27);
+  color: #fff;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+@keyframes case-flash {
+  0%, 100% { box-shadow: var(--shadow-soft); }
+  30% { box-shadow: 0 0 0 4px oklch(0.6 0.22 27 / 0.45), var(--shadow-soft); }
+}
+.case-card.case-flash { animation: case-flash 1.4s ease-in-out 2; }
 .case-head { display: flex; gap: 1rem; align-items: flex-start; }
 .case-photo { width: 5.5rem; height: 5.5rem; flex-shrink: 0; object-fit: cover; border-radius: 1rem; border: 1px solid var(--border); background: oklch(0 0 0 / 0.04); }
 .case-info { min-width: 0; }
