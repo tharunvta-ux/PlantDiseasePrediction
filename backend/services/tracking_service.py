@@ -344,9 +344,13 @@ def check_in(
     notes: str | None,
     followup: Dict[str, Any] | None = None,
     followup_photo: bytes | None = None,
+    note_review: Dict[str, Any] | None = None,
 ) -> str:
     """
     Record the answer for the current step and decide what comes next.
+
+    `note_review` is the AI reply to the grower's note (see
+    checkin_note_service); an urgent note sends the case to an expert.
 
     Returns:
         The feedback message (also stored on the step).
@@ -354,6 +358,8 @@ def check_in(
 
     ensure_can_check_in(case)
     step = case.current_step
+    reply = (note_review or {}).get("reply")
+    urgent = bool((note_review or {}).get("urgent"))
 
     step.outcome = outcome
     step.outcome_at = utcnow()
@@ -362,14 +368,21 @@ def check_in(
     step.followup_photo = followup_photo
 
     if outcome == OUTCOME_WORKED:
-        feedback = worked_message(case, followup)
+        feedback = " ".join(filter(None, [worked_message(case, followup), reply]))
         case.status = CASE_RECOVERED
         step.feedback = feedback
         return feedback
 
     messages, plan = _apply_followup(case, followup)
+    if reply:
+        messages.insert(0, reply)
 
-    if len(case.steps) >= MAX_CASE_STEPS:
+    if urgent and step.kind != KIND_EXPERT:
+        plan = expert_step(
+            "What you describe sounds serious, so please do not wait for another "
+            "step - contact an agricultural expert now."
+        )
+    elif len(case.steps) >= MAX_CASE_STEPS:
         plan = expert_step(
             "Several steps have been tried without success. An expert can examine "
             "the plant in person and find the cause."

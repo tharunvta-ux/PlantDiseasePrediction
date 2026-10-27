@@ -35,6 +35,7 @@ from backend.prediction.predictor import get_predictor
 from backend.routes.auth_routes import current_user, login_required
 from backend.routes.upload_utils import UploadError, saved_image_upload
 from backend.services.analysis_service import analyze_upload
+from backend.services.checkin_note_service import review_note
 from backend.services.languages import normalise_language
 from backend.services.tracking_service import (
     TrackingRequestError,
@@ -219,7 +220,9 @@ def case_check_in(case_id: int):
                     followup = {"error": "analysis_failed"}
                 followup["has_photo"] = True
 
-        feedback = check_in(case, outcome, notes, followup, photo)
+        note_review = review_note(case, outcome, notes, language) if notes else None
+
+        feedback = check_in(case, outcome, notes, followup, photo, note_review)
 
     except TrackingRequestError as exc:
         return _error(str(exc), exc.code, exc.http_status)

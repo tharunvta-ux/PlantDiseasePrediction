@@ -125,10 +125,19 @@ Rules:
 contradict them. Match advice to the pathogen type: no fungicides for \
 viral, bacterial or pest problems; no "cure" for viral diseases or \
 citrus greening.
-- Chemical control: name generic active-ingredient categories only \
-(e.g. "copper-based bactericide", "fungicide labelled for late blight \
-on tomato"). NEVER give product or brand names. NEVER give doses, rates, \
-concentrations, mixing ratios or spray intervals.
+- The app shows the grower a curated treatment plan ("treatment_plan"). \
+Your guidance must agree with it. immediate_steps: restate its care_steps \
+in plain words; do not add other actions.
+- Chemical control: mention chemicals ONLY from \
+treatment_plan.approved_chemical_options, by the given active-ingredient \
+name, as "use one of these"; the app shows the doses separately. If \
+approved_chemical_options is empty, do NOT recommend any chemical or \
+chemical category: say that no chemical is suggested for this case and \
+to ask a local expert before using any (if \
+chemical_options_withheld_until_confirmed is true, say chemicals are \
+only suggested once the diagnosis is confirmed). NEVER give product or \
+brand names. NEVER give doses, rates, concentrations, mixing ratios or \
+spray intervals.
 - Whenever chemical control is mentioned, say to follow the product label \
 and local agricultural guidance, and that suitability depends on the crop, \
 severity and local regulations.
@@ -168,6 +177,39 @@ def _facts_for(class_name: str) -> Dict[str, Any]:
     }
 
 
+_FORMULATION = re.compile(r"\b\d[\d.,]*\s*(?:%|g/l)?|\b(?:SC|WP|WG|EC|SL|OD|WS)\b")
+
+
+def active_ingredient(product_name: str) -> str:
+    """
+    'Azoxystrobin 23% SC' -> 'Azoxystrobin'. Strengths are dropped so the
+    LLM never repeats a number (which the dose filter would remove).
+    """
+
+    return " ".join(_FORMULATION.sub(" ", product_name).split()).strip(" +")
+
+
+def _plan_facts(predicted_class: str, level: str) -> Dict[str, Any]:
+    """The curated plan's care steps and the chemicals it allows."""
+
+    # Imported here: treatment_plan_service imports this module.
+    from backend.services.treatment_plan_service import plan_entry
+
+    entry = plan_entry(predicted_class)
+    options: List[str] = []
+
+    for product in entry.get("products", []):
+        name = active_ingredient(product["name"])
+        if name not in options:
+            options.append(name)
+
+    return {
+        "care_steps": entry.get("care", []),
+        "approved_chemical_options": options if level == LEVEL_HIGH else [],
+        "chemical_options_withheld_until_confirmed": bool(options) and level != LEVEL_HIGH,
+    }
+
+
 def build_user_prompt(
     predicted_class: str,
     level: str,
@@ -180,6 +222,7 @@ def build_user_prompt(
         "model_prediction": _facts_for(predicted_class),
         "confidence_level": level,
         "alternative_predictions": [_facts_for(name) for name in alternatives],
+        "treatment_plan": _plan_facts(predicted_class, level),
     }
 
     return (

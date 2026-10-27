@@ -11,6 +11,21 @@ import pytest
 from tests.test_predict_api import textured_png
 
 
+@pytest.fixture(autouse=True)
+def no_note_llm(monkeypatch):
+    """Check-in notes are not sent to a real LLM in these tests."""
+
+    import backend.routes.tracking_routes as routes
+
+    monkeypatch.setattr(routes, "review_note", lambda *args, **kwargs: None)
+
+
+def fake_note_review(monkeypatch, reply, urgent=False):
+    import backend.routes.tracking_routes as routes
+
+    monkeypatch.setattr(routes, "review_note", lambda *args, **kwargs: {"reply": reply, "urgent": urgent})
+
+
 def register(client, email="grower@example.com", password="leafy-green-1"):
     return client.post("/auth/register", json={"email": email, "password": password})
 
@@ -270,6 +285,40 @@ def test_delete_case(client, fake_predictor):
 
     assert client.delete(f"/cases/{case_id}").status_code == 200
     assert client.get(f"/cases/{case_id}").status_code == 404
+
+
+def test_note_reply_is_shown_and_plan_continues(client, fake_predictor, monkeypatch):
+    register(client)
+    case_id = start_case(client).get_json()["case"]["id"]
+    fake_note_review(monkeypatch, "New spots on top leaves mean it is still active.")
+
+    body = check_in(client, case_id, "not_worked", notes="new spots on top leaves").get_json()
+
+    assert body["feedback"].startswith("New spots on top leaves mean it is still active.")
+    assert body["case"]["current_step"]["kind"] == "treatment"
+
+
+def test_urgent_note_goes_straight_to_expert(client, fake_predictor, monkeypatch):
+    register(client)
+    case_id = start_case(client).get_json()["case"]["id"]
+    fake_note_review(monkeypatch, "That sounds serious.", urgent=True)
+
+    body = check_in(client, case_id, "not_worked", notes="the whole row is wilting").get_json()
+
+    assert body["case"]["status"] == "expert"
+    assert body["case"]["current_step"]["kind"] == "expert"
+    assert "contact an agricultural expert now" in body["feedback"]
+
+
+def test_note_reply_added_when_it_worked(client, fake_predictor, monkeypatch):
+    register(client)
+    case_id = start_case(client).get_json()["case"]["id"]
+    fake_note_review(monkeypatch, "Keep an eye on the fruit too.")
+
+    body = check_in(client, case_id, "worked", notes="leaves fine, one fruit spot").get_json()
+
+    assert body["case"]["status"] == "recovered"
+    assert body["feedback"].endswith("Keep an eye on the fruit too.")
 
 
 # ---------- preview ----------

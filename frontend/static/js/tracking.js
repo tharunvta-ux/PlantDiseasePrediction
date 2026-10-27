@@ -304,7 +304,7 @@
     const name = `outcome-${c.id}`;
     const error = el("p", { class: "explain-error hidden" });
     const submit = el("button", { type: "submit", class: "btn-primary btn-pill", text: "Save check" });
-    const notes = el("textarea", { name: "notes", rows: "2", maxlength: "1000", placeholder: "What do you see? e.g. new spots on top leaves" });
+    const notes = el("textarea", { name: "notes", rows: "2", maxlength: "1000", placeholder: "e.g. new spots on the top leaves, or the spots are drying up" });
     const photo = el("input", { type: "file", name: "file", accept: "image/jpeg,image/png", capture: "environment" });
     const info = dueInfo(step);
 
@@ -323,7 +323,10 @@
           el("span", { text: "It did not work" }),
         ]),
       ]),
-      el("label", { class: "field" }, [el("span", { text: "Notes (optional)" }), notes]),
+      el("label", { class: "field" }, [
+        el("span", { text: "What do you see? (optional: the app replies to your note)" }),
+        notes,
+      ]),
       el("label", { class: "field" }, [
         el("span", { text: "New photo (optional, recommended if it did not work: the app re-checks the diagnosis)" }),
         photo,
