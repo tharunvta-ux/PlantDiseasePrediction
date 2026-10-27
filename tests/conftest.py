@@ -111,6 +111,22 @@ def _clear_recommendation_cache():
     clear_cache()
 
 
+@pytest.fixture(autouse=True)
+def _no_live_translation(monkeypatch):
+    """Translations never call a real LLM in tests (English is used)."""
+
+    import backend.services.translation_service as translation
+    from backend.services.llm import LLMNotConfiguredError
+
+    def not_configured():
+        raise LLMNotConfiguredError("translation disabled in tests")
+
+    monkeypatch.setattr(translation, "get_llm_provider", not_configured)
+    translation.clear_cache()
+    yield
+    translation.clear_cache()
+
+
 @pytest.fixture()
 def no_api_key(monkeypatch):
     """Simulate a server without LLM credentials (ignores local .env)."""

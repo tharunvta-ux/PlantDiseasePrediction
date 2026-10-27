@@ -684,6 +684,21 @@ img { max-width: 100%; display: block; }
 
 .dropzone-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
 
+.nav-lang { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.875rem; }
+.nav-lang select {
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: oklch(1 0 0 / 0.8);
+  padding: 0.3rem 0.5rem;
+  max-width: 9.5rem;
+}
+
+.case-title-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.translating { margin-bottom: 0.5rem; font-style: italic; }
+
 .account-email { display: none; font-size: 0.8125rem; color: var(--muted-foreground); max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-button, .nav-history-mobile { font-size: 0.875rem; font-weight: 500; color: oklch(0.22 0.04 155 / 0.8); padding: 0.25rem; }
 .nav-button:hover, .nav-history-mobile:hover { color: var(--foreground); }

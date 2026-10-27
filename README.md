@@ -116,6 +116,18 @@ crop for 15 of 20 test images (e.g. tomato leaves called potato).
   The photo measure underestimates pale powdery mildew and virus
   mottling, which is why the grower's estimate is included.
 
+- **Every screen in the farmer's language** (🌐 picker in the top bar):
+  plans, history cases, check-in forms and AI-match questions are
+  translated server-side (`translation_service.py`, `localize_service.py`,
+  labels from the allowlist in `ui_text.py`). Product names and doses are
+  never translated, and a translation that changes any number or
+  placeholder is rejected. Translations are cached in the `translations`
+  table, so each text costs one Gemini call per language.
+- **🔊 Read aloud** on "What to do now" and on every history case
+  (`POST /treatment-plan/speech`, `POST /cases/<id>/speech`): the server
+  builds the spoken text from its own data, so the key cannot be used
+  as a free TTS service.
+
 Data is stored with SQLAlchemy: SQLite at `instance/verdant.db` locally,
 Postgres in production via `DATABASE_URL`.
 

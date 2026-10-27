@@ -14,7 +14,9 @@ from werkzeug.exceptions import HTTPException
 from backend.routes.upload_utils import UploadError, saved_image_upload
 from backend.services.analysis_service import analyze_upload
 from backend.services.explanation_service import ExplanationRequestError, explain_image
-from backend.services.languages import normalise_language
+from backend.services.languages import DEFAULT_LANGUAGE, normalise_language
+from backend.services.localize_service import localize_ai_condition
+from backend.services.translation_service import translate_texts
 
 analysis_bp = Blueprint(
     "analysis",
@@ -22,6 +24,23 @@ analysis_bp = Blueprint(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _localized(result: dict, language: str) -> dict:
+    """Server-written messages and AI-match questions in the grower's language."""
+
+    if language == DEFAULT_LANGUAGE:
+        return result
+
+    texts = [result.get("message"), *result.get("notes", [])]
+    mapping = translate_texts([t for t in texts if t], language)
+
+    return {
+        **result,
+        "message": mapping.get(result.get("message"), result.get("message")),
+        "notes": [mapping.get(n, n) for n in result.get("notes", [])],
+        "ai_condition": localize_ai_condition(result.get("ai_condition"), language),
+    }
 
 
 @analysis_bp.route("/analyze", methods=["POST"])
@@ -38,7 +57,9 @@ def analyze():
 
     try:
         with saved_image_upload() as filepath:
-            return jsonify(analyze_upload(filepath, language)), 200
+            result = analyze_upload(filepath, language)
+
+        return jsonify(_localized(result, language)), 200
 
     except UploadError as exc:
         return exc.response

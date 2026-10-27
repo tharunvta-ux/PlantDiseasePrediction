@@ -103,6 +103,8 @@
 
     const saved = storedLanguage();
     languageSelect.value = languages.some((l) => l.code === saved) ? saved : "en";
+    // tracking.js translates the plan and history screens.
+    document.dispatchEvent(new CustomEvent("verdant:languages"));
   }
 
   const LEVEL_TEXT = {

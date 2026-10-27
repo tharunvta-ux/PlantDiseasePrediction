@@ -5,6 +5,11 @@
  * ("verdant:reset"); this file shows the first step of the plan, saves it
  * as a tracked case, and lets the grower report "worked / did not work"
  * at each check.
+ *
+ * Language: plan and case texts arrive translated from the server
+ * (?language=…), interface labels via /ui-text, and 🔊 reads a plan or a
+ * case aloud in the chosen language. Product names and doses are never
+ * translated.
  */
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -12,6 +17,7 @@
   const planPanel = $("planPanel");
   const planStep = $("planStep");
   const planActions = $("planActions");
+  const planSpeakBtn = $("planSpeakBtn");
   const trackBtn = $("trackBtn");
   const trackNote = $("trackNote");
 
@@ -26,6 +32,7 @@
   const dueBanner = $("dueBanner");
   const historyEmpty = $("historyEmpty");
   const historyError = $("historyError");
+  const historyTranslating = $("historyTranslating");
   const caseList = $("caseList");
 
   const authDialog = $("authDialog");
@@ -49,10 +56,11 @@
   let authMode = "login";
   let pendingTrack = false;
 
-  // Latest analysis from app.js and its plan preview.
+  // Latest analysis from app.js and what the plan panel shows for it.
   let lastAnalysis = null;
   let lastFile = null;
   let lastPlan = null;
+  let planState = null; // { mode: "confirm" | "checks" | "plan", fields, answer, extent }
 
   /* ---------- helpers ---------- */
 
@@ -98,10 +106,56 @@
     return (select && select.value) || "en";
   }
 
-  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  /* ---------- interface labels ---------- */
 
-  function formatDate(iso) {
-    return iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
+  let uiStrings = {};
+  let uiLanguage = "en";
+
+  // Translated label; {name} placeholders are filled from `vars`.
+  function T(template, vars = {}) {
+    const text = (uiLanguage === language() && uiStrings[template]) || template;
+    return text.replace(/\{([a-z_]+)\}/g, (match, key) => (key in vars ? String(vars[key]) : match));
+  }
+
+  const countText = (n, word) => T(n === 1 ? `{n} ${word}` : `{n} ${word}s`, { n });
+
+  async function loadUiText() {
+    const lang = language();
+    if (lang === "en") {
+      uiStrings = {};
+      uiLanguage = "en";
+      return;
+    }
+    try {
+      const data = await api(`/ui-text?language=${encodeURIComponent(lang)}`);
+      if (lang !== language()) return;
+      uiStrings = data.strings || {};
+      uiLanguage = lang;
+    } catch (_) {
+      /* labels stay in English */
+    }
+  }
+
+  // Static page text marked data-i18n="…English…".
+  function applyStaticText() {
+    document.querySelectorAll("[data-i18n]").forEach((node) => {
+      node.textContent = T(node.dataset.i18n, { n: node.dataset.i18nN || "" });
+    });
+  }
+
+  function locale() {
+    const lang = language();
+    return lang === "en" ? undefined : `${lang}-IN`;
+  }
+
+  function formatDate(iso, withYear = true) {
+    if (!iso) return "";
+    const options = withYear ? { day: "numeric", month: "short", year: "numeric" } : { day: "numeric", month: "short" };
+    try {
+      return new Date(iso).toLocaleDateString(locale(), options);
+    } catch (_) {
+      return new Date(iso).toLocaleDateString(undefined, options);
+    }
   }
 
   function startOfDay(date) {
@@ -112,23 +166,122 @@
     if (!step || !step.check_due_at) return null;
     const due = new Date(step.check_due_at);
     const days = Math.round((startOfDay(due) - startOfDay(new Date())) / 86400000);
-    const date = due.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    const date = formatDate(step.check_due_at, false);
 
-    if (days > 1) return { due: false, text: `Check again in ${days} days (${date})` };
-    if (days === 1) return { due: false, text: `Check again tomorrow (${date})` };
-    if (days === 0) return { due: true, text: "Check due today" };
-    return { due: true, text: `Check overdue by ${plural(-days, "day")}` };
+    if (days > 1) return { due: false, text: T("Check again in {days} ({date})", { days: countText(days, "day"), date }) };
+    if (days === 1) return { due: false, text: T("Check again tomorrow ({date})", { date }) };
+    if (days === 0) return { due: true, text: T("Check due today") };
+    return { due: true, text: T("Check overdue by {days}", { days: countText(-days, "day") }) };
   }
 
   const isDue = (c) => c.awaiting_check_in && Boolean((dueInfo(c.current_step) || {}).due);
+
+  /* ---------- read aloud ----------
+   * The server builds the spoken text from its own plan / case data in the
+   * chosen language. English uses the browser's voice; other languages use
+   * server audio (most devices have no Tamil, Telugu, … voice), one short
+   * part at a time while the next part is prepared. */
+
+  const speech = "speechSynthesis" in window ? window.speechSynthesis : null;
+  const player = new Audio();
+  let speaking = null; // { button, session, finish }
+  let speakSession = 0;
+
+  function speakButton(onclick) {
+    const button = el("button", { type: "button", class: "btn-outline btn-pill speak-btn", "aria-pressed": "false", onclick });
+    setSpeakState(button, "idle");
+    return button;
+  }
+
+  function setSpeakState(button, state) {
+    const labels = { idle: "🔊 Read aloud", loading: "⏳ Preparing audio…", playing: "⏹ Stop reading" };
+    button.textContent = T(labels[state]);
+    button.setAttribute("aria-pressed", state === "playing" ? "true" : "false");
+    button.disabled = state === "loading";
+  }
+
+  function stopSpeaking() {
+    speakSession += 1;
+    if (speech) speech.cancel();
+    player.pause();
+    if (speaking) {
+      setSpeakState(speaking.button, "idle");
+      if (speaking.finish) speaking.finish();
+    }
+    speaking = null;
+  }
+
+  async function readAloud(button, url, body) {
+    if (speaking && speaking.button === button) {
+      stopSpeaking();
+      return;
+    }
+    stopSpeaking();
+
+    const session = speakSession;
+    const lang = language();
+    speaking = { button, session };
+    setSpeakState(button, "loading");
+
+    try {
+      const info = await postJson(url, { ...body, language: lang });
+      if (session !== speakSession) return;
+
+      if (info.speech_lang.toLowerCase().startsWith("en") && speech) {
+        speech.cancel();
+        info.parts.forEach((text, index) => {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = info.speech_lang;
+          if (index === info.parts.length - 1) utterance.onend = () => { if (session === speakSession) stopSpeaking(); };
+          speech.speak(utterance);
+        });
+        setSpeakState(button, "playing");
+        return;
+      }
+
+      const fetchPart = async (part) => {
+        const response = await fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body, language: lang, part }),
+        });
+        if (!response.ok) throw new Error("audio");
+        return URL.createObjectURL(await response.blob());
+      };
+
+      let next = fetchPart(0);
+      for (let index = 0; index < info.parts.length; index += 1) {
+        const src = await next;
+        if (session !== speakSession) return URL.revokeObjectURL(src);
+        if (index + 1 < info.parts.length) next = fetchPart(index + 1);
+
+        player.src = src;
+        await player.play();
+        setSpeakState(button, "playing");
+        await new Promise((resolve) => {
+          player.onended = resolve;
+          speaking.finish = resolve;
+        });
+        URL.revokeObjectURL(src);
+        if (session !== speakSession) return;
+      }
+      stopSpeaking();
+    } catch (_) {
+      if (session !== speakSession) return;
+      stopSpeaking();
+      button.title = T("Could not play the audio. Please try again in a minute.");
+      window.alert(button.title);
+    }
+  }
 
   /* ---------- step rendering (plan panel + history) ---------- */
 
   function expertLinks() {
     return el("div", { class: "expert-links" }, [
-      el("a", { class: "btn-primary btn-pill", href: `tel:${KISAN_CALL_CENTRE.replace(/-/g, "")}`, text: `📞 Kisan Call Centre ${KISAN_CALL_CENTRE}` }),
-      el("a", { class: "btn-outline btn-pill", href: mapsSearch("Krishi Vigyan Kendra near me"), target: "_blank", rel: "noopener", text: "📍 Krishi Vigyan Kendra nearby" }),
-      el("a", { class: "btn-outline btn-pill", href: mapsSearch("agriculture department office near me"), target: "_blank", rel: "noopener", text: "📍 Agriculture office nearby" }),
+      el("a", { class: "btn-primary btn-pill", href: `tel:${KISAN_CALL_CENTRE.replace(/-/g, "")}`, text: T("📞 Kisan Call Centre {number}", { number: KISAN_CALL_CENTRE }) }),
+      el("a", { class: "btn-outline btn-pill", href: mapsSearch("Krishi Vigyan Kendra near me"), target: "_blank", rel: "noopener", text: T("📍 Krishi Vigyan Kendra nearby") }),
+      el("a", { class: "btn-outline btn-pill", href: mapsSearch("agriculture department office near me"), target: "_blank", rel: "noopener", text: T("📍 Agriculture office nearby") }),
     ]);
   }
 
@@ -138,11 +291,12 @@
     return el("div", { class: "product-card" }, [
       el("p", {
         class: "product-title",
-        text: step.products.length > 1 ? "Use ONE of these TNAU-recommended options:" : "TNAU-recommended option:",
+        text: T(step.products.length > 1 ? "Use ONE of these TNAU-recommended options:" : "TNAU-recommended option:"),
       }),
       el("table", { class: "product-table" }, [
         el("tbody", {}, step.products.map((p) =>
           el("tr", {}, [
+            // Name and dose exactly as TNAU lists them, in every language.
             el("td", {}, [el("strong", { text: p.name }), el("span", { class: "product-kind", text: `${p.kind} · ${p.group}` })]),
             el("td", { class: "product-dose", text: p.dose }),
           ])
@@ -150,7 +304,7 @@
       ]),
       step.source_url
         ? el("p", { class: "treatment-meta" }, [
-            "Source: ",
+            `${T("Source:")} `,
             el("a", { href: step.source_url, target: "_blank", rel: "noopener", text: "TNAU Agritech Portal" }),
           ])
         : null,
@@ -159,9 +313,11 @@
 
   // inHistory: the check-in form below already asks the check question.
   function stepBody(step, inHistory = false) {
-    const waitText = step.wait_days
-      ? `Then wait ${plural(step.wait_days, "day")} and check` +
-        (inHistory ? " again." : `: ${step.check_question}`)
+    const days = step.wait_days ? countText(step.wait_days, "day") : null;
+    const waitText = days
+      ? inHistory
+        ? T("Then wait {days} and check again.", { days })
+        : T("Then wait {days} and check: {question}", { days, question: step.check_question })
       : null;
 
     return el("div", { class: `step-body step-${step.kind}` }, [
@@ -206,12 +362,14 @@
 
   function hidePlan() {
     lastPlan = null;
+    planState = null;
     planPanel.classList.add("hidden");
+    planSpeakBtn.classList.add("hidden");
   }
 
   function resetTrackButton() {
     trackBtn.disabled = false;
-    trackBtn.textContent = user ? "Track this treatment" : "Sign in to track this treatment";
+    trackBtn.textContent = T(user ? "Track this treatment" : "Sign in to track this treatment");
   }
 
   async function showPlan(analysis, file) {
@@ -220,106 +378,137 @@
     hidePlan();
 
     if (analysis.ai_condition && analysis.route === "unsupported_plant") {
-      askToConfirm(analysis);
+      planState = { mode: "confirm" };
+      renderPlanState();
       return;
     }
 
     const fields = diagnosisFields(analysis);
-    if (fields) await loadPlan(analysis, fields);
+    if (fields) {
+      planState = { mode: "plan", fields, answer: null, extent: null };
+      await loadPlan();
+    }
+  }
+
+  // Re-draw the plan panel (after an answer, or in a new language).
+  function renderPlanState() {
+    if (!planState || !lastAnalysis) return;
+    if (planState.mode === "confirm") askCrop();
+    else if (planState.mode === "checks") symptomChecks();
+    else loadPlan();
   }
 
   /* An AI-matched disease of a crop the disease model does not cover.
    * TNAU products are only shown after the grower confirms it:
    * 1. "Is this a <crop> plant?" (growers know what they planted),
    * 2. simple yes/no checks they can do by looking at / touching a leaf. */
-  function askToConfirm(analysis) {
-    const condition = analysis.ai_condition;
-    const id = analysis.plant_identification || {};
+
+  const ANSWERS = {
+    yes: "Your answers match this disease.",
+    unsure: "Your answers only partly match, so safe care steps come first.",
+    no: "Your answers do not match this disease, so general care steps are shown.",
+    wrong_crop: "You said this is not the plant the AI named, so general care steps are shown.",
+  };
+
+  function answerMatch(choice) {
+    const condition = lastAnalysis.ai_condition;
+    const id = lastAnalysis.plant_identification || {};
     const plantName = id.plant_common_name || condition.crop;
+    const general = choice === "no" || choice === "wrong_crop";
 
-    const ANSWERS = {
-      yes: "Your answers match this disease.",
-      unsure: "Your answers only partly match, so safe care steps come first.",
-      no: "Your answers do not match this disease, so general care steps are shown.",
-      wrong_crop: "You said this is not the plant the AI named, so general care steps are shown.",
+    planState = {
+      mode: "plan",
+      answer: choice,
+      extent: null,
+      fields: general
+        ? { predicted_class: "", confidence_level: "", plant_name: choice === "wrong_crop" ? "Plant" : plantName, general_advice: id.general_advice || [] }
+        : { predicted_class: condition.id, confidence_level: choice === "yes" ? "high" : "uncertain", plant_name: plantName },
     };
+    loadPlan();
+  }
 
-    function answer(choice) {
-      const general = choice === "no" || choice === "wrong_crop";
-      const fields = general
-        ? { predicted_class: "", confidence_level: "", plant_name: general && choice === "wrong_crop" ? "Plant" : plantName, general_advice: id.general_advice || [] }
-        : { predicted_class: condition.id, confidence_level: choice === "yes" ? "high" : "uncertain", plant_name: plantName };
+  function restartMatch() {
+    planState = { mode: "confirm" };
+    renderPlanState();
+  }
 
-      const intro = el("p", { class: "match-answer" }, [
-        `${condition.display_name}: ${ANSWERS[choice]} `,
-        el("button", { type: "button", class: "link-button", text: "Change answers", onclick: () => askToConfirm(analysis) }),
-      ]);
-
-      loadPlan(analysis, fields, intro);
-    }
-
-    const askExpert = el("details", { class: "ask-expert" }, [
-      el("summary", { text: "Not sure? Ask an expert first" }),
-      el("p", { class: "treatment-meta", text: "An expert can confirm the disease from the plant or a photo before you spend money on any treatment." }),
+  function askExpert() {
+    return el("details", { class: "ask-expert" }, [
+      el("summary", { text: T("Not sure? Ask an expert first") }),
+      el("p", { class: "treatment-meta", text: T("An expert can confirm the disease from the plant or a photo before you spend money on any treatment.") }),
       expertLinks(),
     ]);
+  }
 
-    function symptomChecks() {
-      const answers = condition.checks.map(() => null);
-      const showPlan = el("button", { type: "button", class: "btn-primary btn-pill", text: "Show what to do" });
-
-      const rows = condition.checks.map((question, index) =>
-        el("div", { class: "check-row" }, [
-          el("p", { class: "check-question", text: question }),
-          el("div", { class: "check-buttons", role: "radiogroup" }, ["yes", "no"].map((value) =>
-            el("label", { class: `check-option check-${value}` }, [
-              el("input", { type: "radio", name: `check-${index}`, value, onchange: () => { answers[index] = value; } }),
-              el("span", { text: value === "yes" ? "Yes" : "No" }),
-            ])
-          )),
-        ])
-      );
-
-      showPlan.addEventListener("click", () => {
-        const yes = answers.filter((a) => a === "yes").length;
-        const no = answers.filter((a) => a === "no").length;
-        // All yes confirms; any yes (or unanswered) is "not sure"; all no rules it out.
-        answer(yes === answers.length ? "yes" : no === answers.length ? "no" : "unsure");
-      });
-
-      planStep.replaceChildren(
-        el("div", { class: "match-card" }, [
-          el("p", { class: "result-eyebrow", text: "Possible match found by AI" }),
-          el("h4", { class: "step-title", text: condition.display_name }),
-          el("p", { class: "checkin-question", text: "Look closely at the plant and answer:" }),
-          ...rows,
-          el("p", { class: "treatment-meta", text: "Skip a question if you cannot tell." }),
-          el("div", { class: "match-buttons" }, [showPlan]),
-          el("p", { class: "treatment-meta" }, [
-            "Compare with ",
-            el("a", { href: condition.source_url, target: "_blank", rel: "noopener", class: "inline-link", text: "TNAU's page with photos" }),
-            ".",
-          ]),
-          askExpert,
-        ])
-      );
-    }
+  function askCrop() {
+    const condition = lastAnalysis.ai_condition;
+    const crop = condition.crop.toLowerCase();
 
     lastPlan = null;
+    planSpeakBtn.classList.add("hidden");
     planStep.replaceChildren(
       el("div", { class: "match-card" }, [
-        el("p", { class: "result-eyebrow", text: "Possible match found by AI" }),
+        el("p", { class: "result-eyebrow", text: T("Possible match found by AI") }),
         el("h4", { class: "step-title", text: condition.display_name }),
-        el("p", { class: "checkin-question", text: `First: is this a ${condition.crop.toLowerCase()} plant?` }),
+        el("p", { class: "checkin-question", text: T("First: is this a {crop} plant?", { crop }) }),
         el("div", { class: "match-buttons" }, [
-          el("button", { type: "button", class: "btn-primary btn-pill", text: `Yes, it is ${condition.crop.toLowerCase()}`, onclick: symptomChecks }),
-          el("button", { type: "button", class: "btn-outline btn-pill", text: "No", onclick: () => answer("wrong_crop") }),
+          el("button", {
+            type: "button",
+            class: "btn-primary btn-pill",
+            text: T("Yes, it is {crop}", { crop }),
+            onclick: () => { planState = { mode: "checks" }; renderPlanState(); },
+          }),
+          el("button", { type: "button", class: "btn-outline btn-pill", text: T("No"), onclick: () => answerMatch("wrong_crop") }),
         ]),
-        el("p", { class: "treatment-meta", text: condition.has_products ? "TNAU lists a treatment for this; it is shown once your answers match." : "" }),
+        condition.has_products
+          ? el("p", { class: "treatment-meta", text: T("TNAU lists a treatment for this; it is shown once your answers match.") })
+          : null,
       ])
     );
     planActions.classList.add("hidden");
     planPanel.classList.remove("hidden");
+  }
+
+  function symptomChecks() {
+    const condition = lastAnalysis.ai_condition;
+    const answers = condition.checks.map(() => null);
+    const showButton = el("button", { type: "button", class: "btn-primary btn-pill", text: T("Show what to do") });
+
+    const rows = condition.checks.map((question, index) =>
+      el("div", { class: "check-row" }, [
+        el("p", { class: "check-question", text: question }),
+        el("div", { class: "check-buttons", role: "radiogroup" }, ["yes", "no"].map((value) =>
+          el("label", { class: `check-option check-${value}` }, [
+            el("input", { type: "radio", name: `check-${index}`, value, onchange: () => { answers[index] = value; } }),
+            el("span", { text: T(value === "yes" ? "Yes" : "No") }),
+          ])
+        )),
+      ])
+    );
+
+    showButton.addEventListener("click", () => {
+      const yes = answers.filter((a) => a === "yes").length;
+      const no = answers.filter((a) => a === "no").length;
+      // All yes confirms; any yes (or unanswered) is "not sure"; all no rules it out.
+      answerMatch(yes === answers.length ? "yes" : no === answers.length ? "no" : "unsure");
+    });
+
+    planStep.replaceChildren(
+      el("div", { class: "match-card" }, [
+        el("p", { class: "result-eyebrow", text: T("Possible match found by AI") }),
+        el("h4", { class: "step-title", text: condition.display_name }),
+        el("p", { class: "checkin-question", text: T("Look closely at the plant and answer:") }),
+        ...rows,
+        el("p", { class: "treatment-meta", text: T("Skip a question if you cannot tell.") }),
+        el("div", { class: "match-buttons" }, [showButton]),
+        el("p", { class: "treatment-meta" }, [
+          `${T("Compare with")} `,
+          el("a", { href: condition.source_url, target: "_blank", rel: "noopener", class: "inline-link", text: T("TNAU's page with photos") }),
+          ".",
+        ]),
+        askExpert(),
+      ])
+    );
   }
 
   const EXTENTS = [
@@ -329,6 +518,7 @@
   ];
   const OUTLOOK_ICON = { good: "🟢", fair: "🟡", poor: "🔴" };
   const TREND_TEXT = { improving: "↓ Improving", same: "→ About the same", worsening: "↑ Getting worse" };
+  const GRADE_TEXT = { mild: "Mild", moderate: "Moderate", severe: "Severe" };
 
   function outlookBox(outlook) {
     return outlook
@@ -338,54 +528,87 @@
 
   function severityText(severity) {
     if (!severity || !severity.grade) return "";
-    const grade = severity.grade[0].toUpperCase() + severity.grade.slice(1);
-    return severity.affected_percent != null ? `${grade} (about ${Math.round(severity.affected_percent)}% of the leaf)` : grade;
+    const grade = T(GRADE_TEXT[severity.grade] || severity.grade);
+    return severity.affected_percent != null
+      ? T("{grade} (about {percent}% of the leaf)", { grade, percent: Math.round(severity.affected_percent) })
+      : grade;
   }
 
   // "How much of the plant has this?" + photo measurement + outlook.
-  function severityCard(severity, photo, onExtent, selected) {
+  function severityCard(severity, photo, selected) {
     return el("div", { class: "severity-card" }, [
-      el("p", { class: "checkin-question", text: "How much of the plant has this?" }),
+      el("p", { class: "checkin-question", text: T("How much of the plant has this?") }),
       el("div", { class: "extent-options" }, EXTENTS.map(([value, label]) =>
         el("button", {
           type: "button",
           class: `extent-option${selected === value ? " selected" : ""}`,
           "aria-pressed": selected === value ? "true" : "false",
-          text: label,
-          onclick: () => onExtent(value),
+          text: T(label),
+          onclick: () => { planState.extent = value; loadPlan(); },
         })
       )),
       photo && photo.reliable
-        ? el("p", { class: "treatment-meta", text: `Photo check: about ${Math.round(photo.affected_percent)}% of the visible leaf area looks affected (approximate).` })
+        ? el("p", { class: "treatment-meta", text: T("Photo check: about {percent}% of the visible leaf area looks affected (approximate).", { percent: Math.round(photo.affected_percent) }) })
         : null,
-      severity && severity.grade ? el("p", { class: "severity-grade", text: `Severity: ${severityText(severity)}` }) : null,
+      severity && severity.grade ? el("p", { class: "severity-grade", text: T("Severity: {text}", { text: severityText(severity) }) }) : null,
       outlookBox(severity && severity.outlook),
     ]);
   }
 
-  async function loadPlan(analysis, fields, intro = null, extent = null) {
-    let data;
-    try {
-      data = await postJson("/treatment-plan", { ...fields, photo_severity: analysis.photo_severity || null, extent });
-    } catch (_) {
-      return; // the rest of the result is still useful without a plan
+  function planRequest() {
+    return {
+      ...planState.fields,
+      photo_severity: lastAnalysis.photo_severity || null,
+      extent: planState.extent,
+    };
+  }
+
+  let planToken = 0;
+
+  // English first (fast), then the chosen language when it differs.
+  async function loadPlan() {
+    const analysis = lastAnalysis;
+    const state = planState;
+    const token = ++planToken;
+    const lang = language();
+
+    for (const pass of lang === "en" ? ["en"] : ["en", lang]) {
+      let data;
+      try {
+        data = await postJson("/treatment-plan", { ...planRequest(), language: pass });
+      } catch (_) {
+        return; // the rest of the result is still useful without a plan
+      }
+      if (token !== planToken || analysis !== lastAnalysis || state !== planState) return;
+      if (!data.trackable || !data.step) return;
+      renderPlan(data, pass !== lang);
     }
+  }
 
-    if (analysis !== lastAnalysis || !data.trackable || !data.step) return;
+  function renderPlan(data, translating) {
+    const intro = planState.answer
+      ? el("p", { class: "match-answer" }, [
+          `${lastAnalysis.ai_condition.display_name}: ${T(ANSWERS[planState.answer])} `,
+          el("button", { type: "button", class: "link-button", text: T("Change answers"), onclick: restartMatch }),
+        ])
+      : null;
 
-    lastPlan = { fields, step: data.step, extent };
+    lastPlan = { fields: planState.fields, step: data.step, extent: planState.extent };
     planStep.replaceChildren(...[
       intro,
+      translating ? el("p", { class: "treatment-meta translating", text: T("Translating…") }) : null,
       stepBody(data.step),
-      severityCard(data.severity, analysis.photo_severity, (value) => loadPlan(analysis, fields, intro, value), extent),
+      severityCard(data.severity, lastAnalysis.photo_severity, planState.extent),
     ].filter(Boolean));
     planActions.classList.remove("hidden");
+    planSpeakBtn.classList.remove("hidden");
+    if (!speaking || speaking.button !== planSpeakBtn) setSpeakState(planSpeakBtn, "idle");
 
     const meta = data.meta || {};
     trackNote.textContent =
-      "Tracking saves this plan to your history and shows when to check whether it worked." +
+      T("Tracking saves this plan to your history and shows when to check whether it worked.") +
       (data.step.products.length && meta.checked_on
-        ? ` Product options copied from TNAU (checked ${meta.checked_on}); not yet reviewed by an agronomist.`
+        ? ` ${T("Product options copied from TNAU (checked {date}); not yet reviewed by an agronomist.", { date: meta.checked_on })}`
         : "");
 
     resetTrackButton();
@@ -402,7 +625,7 @@
     }
 
     trackBtn.disabled = true;
-    trackBtn.textContent = "Saving…";
+    trackBtn.textContent = T("Saving…");
 
     const form = new FormData();
     form.append("file", lastFile);
@@ -410,11 +633,12 @@
       form.append(key, Array.isArray(value) ? JSON.stringify(value) : value)
     );
     if (lastPlan.extent) form.append("extent", lastPlan.extent);
+    form.append("language", language());
 
     try {
       await api("/cases", { method: "POST", body: form });
-      trackBtn.textContent = "✓ Tracking started";
-      trackNote.replaceChildren("Saved. ", el("a", { href: "#history", class: "inline-link", text: "Open your treatment history" }), ".");
+      trackBtn.textContent = T("✓ Tracking started");
+      trackNote.replaceChildren(`${T("Saved.")} `, el("a", { href: "#history", class: "inline-link", text: T("Open your treatment history") }));
       await loadCases();
     } catch (err) {
       if (err.status === 401) {
@@ -434,14 +658,13 @@
     expert: ["See an expert", "chip-diseased"],
   };
 
-  const LEVEL = { high: "high confidence", uncertain: "uncertain" };
+  const LEVEL = { high: "diagnosis high confidence", uncertain: "diagnosis uncertain" };
   const AI_MATCH_LEVEL = { high: "AI match, confirmed by you", uncertain: "AI match, not confirmed" };
 
   function diagnosisLabel(c) {
     if (!c.confidence_level) return "";
     const labels = c.diagnosis_source === "ai_match" ? AI_MATCH_LEVEL : LEVEL;
-    const text = labels[c.confidence_level] || c.confidence_level;
-    return c.diagnosis_source === "ai_match" ? ` · ${text}` : ` · diagnosis ${text}`;
+    return ` · ${T(labels[c.confidence_level] || c.confidence_level)}`;
   }
 
   function latestFeedback(c) {
@@ -460,41 +683,41 @@
   function checkInForm(c, step) {
     const name = `outcome-${c.id}`;
     const error = el("p", { class: "explain-error hidden" });
-    const submit = el("button", { type: "submit", class: "btn-primary btn-pill", text: "Save check" });
-    const notes = el("textarea", { name: "notes", rows: "2", maxlength: "1000", placeholder: "e.g. new spots on the top leaves, or the spots are drying up" });
+    const submit = el("button", { type: "submit", class: "btn-primary btn-pill", text: T("Save check") });
+    const notes = el("textarea", { name: "notes", rows: "2", maxlength: "1000", placeholder: T("e.g. new spots on the top leaves, or the spots are drying up") });
     const photo = el("input", { type: "file", name: "file", accept: "image/jpeg,image/png", capture: "environment" });
     const info = dueInfo(step);
     const extentName = `extent-${c.id}`;
 
     const form = el("form", { class: "checkin-form", novalidate: true }, [
-      el("p", { class: "checkin-question", text: step.check_question || "Did it work?" }),
+      el("p", { class: "checkin-question", text: step.check_question || T("Did it work?") }),
       info && !info.due
-        ? el("p", { class: "treatment-meta", text: "You can check early if the result is already clear." })
+        ? el("p", { class: "treatment-meta", text: T("You can check early if the result is already clear.") })
         : null,
       el("div", { class: "outcome-options", role: "radiogroup" }, [
         el("label", { class: "outcome-option outcome-worked" }, [
           el("input", { type: "radio", name, value: "worked" }),
-          el("span", { text: "It worked" }),
+          el("span", { text: T("It worked") }),
         ]),
         el("label", { class: "outcome-option outcome-not-worked" }, [
           el("input", { type: "radio", name, value: "not_worked" }),
-          el("span", { text: "It did not work" }),
+          el("span", { text: T("It did not work") }),
         ]),
       ]),
       el("label", { class: "field" }, [
-        el("span", { text: "What do you see? (optional: the app replies to your note)" }),
+        el("span", { text: T("What do you see? (optional: the app replies to your note)") }),
         notes,
       ]),
       el("div", { class: "field" }, [
-        el("span", { text: "How much of the plant has it now? (optional)" }),
+        el("span", { text: T("How much of the plant has it now? (optional)") }),
         el("div", { class: "extent-options", role: "radiogroup" }, EXTENTS.map(([value, label]) =>
-          el("label", { class: "extent-option" }, [el("input", { type: "radio", name: extentName, value }), el("span", { text: label })])
+          el("label", { class: "extent-option" }, [el("input", { type: "radio", name: extentName, value }), el("span", { text: T(label) })])
         )),
       ]),
       el("label", { class: "field" }, [
-        el("span", { text: "New photo (recommended: the app measures whether the disease is shrinking and re-checks the diagnosis)" }),
+        el("span", { text: T("New photo (recommended: the app measures whether the disease is shrinking and re-checks the diagnosis)") }),
         photo,
-        el("span", { class: "photo-tip", text: "Tip: photograph the same plant from about the same distance as last time." }),
+        el("span", { class: "photo-tip", text: T("Tip: photograph the same plant from about the same distance as last time.") }),
       ]),
       error,
       submit,
@@ -506,14 +729,14 @@
 
       const choice = form.querySelector(`input[name="${name}"]:checked`);
       if (!choice) {
-        error.textContent = "Choose whether it worked.";
+        error.textContent = T("Choose whether it worked.");
         error.classList.remove("hidden");
         return;
       }
 
       const file = photo.files[0];
       if (file && file.size > MAX_UPLOAD_BYTES) {
-        error.textContent = "The photo is too large. Maximum size is 10 MB.";
+        error.textContent = T("The photo is too large. Maximum size is 10 MB.");
         error.classList.remove("hidden");
         return;
       }
@@ -527,7 +750,7 @@
       if (file) body.append("file", file);
 
       submit.disabled = true;
-      submit.textContent = file ? "Re-checking the new photo…" : "Saving…";
+      submit.textContent = T(file ? "Re-checking the new photo…" : "Saving…");
 
       try {
         const data = await api(`/cases/${c.id}/checkin`, { method: "POST", body });
@@ -539,7 +762,7 @@
         error.textContent = err.message;
         error.classList.remove("hidden");
         submit.disabled = false;
-        submit.textContent = "Save check";
+        submit.textContent = T("Save check");
       }
     });
 
@@ -551,30 +774,30 @@
     if (!done.length) return null;
 
     return el("details", { class: "case-timeline" }, [
-      el("summary", { text: `Steps so far (${done.length})` }),
+      el("summary", { text: T("Steps so far ({n})", { n: done.length }) }),
       el("ol", {}, done.map((s) => {
         const f = s.followup;
         return el("li", { class: "timeline-item" }, [
           el("div", { class: "timeline-head" }, [
-            el("strong", { text: `Step ${s.number}: ${s.title}` }),
+            el("strong", { text: T("Step {n}: {title}", { n: s.number, title: s.title }) }),
             el("span", {
               class: `level-pill ${s.outcome === "worked" ? "level-high" : "level-low"}`,
-              text: s.outcome === "worked" ? "Worked" : "Did not work",
+              text: T(s.outcome === "worked" ? "Worked" : "Did not work"),
             }),
           ]),
-          el("p", { class: "treatment-meta", text: `Started ${formatDate(s.created_at)} · checked ${formatDate(s.outcome_at)}` }),
+          el("p", { class: "treatment-meta", text: T("Started {date} · checked {checked}", { date: formatDate(s.created_at), checked: formatDate(s.outcome_at) }) }),
           s.products.length
-            ? el("p", { class: "timeline-text", text: `Products suggested: ${s.products.map((p) => p.name).join(" or ")}` })
+            ? el("p", { class: "timeline-text", text: T("Products suggested: {products}", { products: s.products.map((p) => p.name).join(" / ") }) })
             : null,
-          s.notes ? el("p", { class: "timeline-text", text: `Your notes: ${s.notes}` }) : null,
+          s.notes ? el("p", { class: "timeline-text", text: T("Your notes: {notes}", { notes: s.notes }) }) : null,
           s.severity && s.severity.grade
             ? el("p", { class: "timeline-text" }, [
-                `Severity: ${severityText(s.severity)}`,
-                s.severity.trend ? ` — ${TREND_TEXT[s.severity.trend.direction]} (${s.severity.trend.text})` : "",
+                T("Severity: {text}", { text: severityText(s.severity) }),
+                s.severity.trend ? ` — ${T(TREND_TEXT[s.severity.trend.direction])} (${s.severity.trend.text})` : "",
               ])
             : null,
           f && f.display_name
-            ? el("p", { class: "timeline-text", text: `New photo: ${f.display_name} (${LEVEL[f.confidence_level] || f.confidence_level || "unclear"})` })
+            ? el("p", { class: "timeline-text", text: T("New photo: {result}", { result: f.display_name }) })
             : null,
           s.followup_photo_url
             ? el("img", { class: "timeline-photo", src: s.followup_photo_url, alt: `Check-in photo, step ${s.number}`, loading: "lazy" })
@@ -586,7 +809,7 @@
   }
 
   async function deleteCase(c) {
-    if (!window.confirm(`Delete the treatment record for ${c.display_name}? This cannot be undone.`)) return;
+    if (!window.confirm(T("Delete the treatment record for {name}? This cannot be undone.", { name: c.display_name }))) return;
     try {
       await api(`/cases/${c.id}`, { method: "DELETE" });
       cases = cases.filter((item) => item.id !== c.id);
@@ -594,6 +817,17 @@
     } catch (err) {
       window.alert(err.message);
     }
+  }
+
+  const caseSpeakButtons = new Map(); // case id -> button (kept across re-renders while playing)
+
+  function caseSpeakButton(c) {
+    let button = caseSpeakButtons.get(c.id);
+    if (!button || !(speaking && speaking.button === button)) {
+      button = speakButton(() => readAloud(button, `/cases/${c.id}/speech`, {}));
+      caseSpeakButtons.set(c.id, button);
+    }
+    return button;
   }
 
   function caseCard(c) {
@@ -606,22 +840,25 @@
     const trend = severity && severity.trend;
 
     return el("article", { class: `case-card glass${isDue(c) ? " case-due" : ""}`, id: `case-${c.id}` }, [
-      isDue(c) ? el("p", { class: "due-ribbon", text: `⏰ ${info.text} - answer below` }) : null,
+      isDue(c) ? el("p", { class: "due-ribbon", text: T("⏰ {due} - answer below", { due: info.text }) }) : null,
       el("div", { class: "case-head" }, [
-        el("img", { class: "case-photo", src: c.photo_url, alt: `Photo of ${c.plant_name}`, loading: "lazy" }),
+        el("img", { class: "case-photo", src: c.photo_url, alt: c.plant_name, loading: "lazy" }),
         el("div", { class: "case-info" }, [
-          el("h3", { text: c.display_name }),
+          el("div", { class: "case-title-row" }, [
+            el("h3", { text: c.display_name }),
+            caseSpeakButton(c),
+          ]),
           el("p", {
             class: "treatment-meta",
-            text: `${c.plant_name} · started ${formatDate(c.created_at)} · step ${step.number}` + diagnosisLabel(c),
+            text: T("{plant} · started {date} · step {n}", { plant: c.plant_name, date: formatDate(c.created_at), n: step.number }) + diagnosisLabel(c),
           }),
           el("div", { class: "result-chips" }, [
-            el("span", { class: `chip ${statusClass}`, text: statusText }),
+            el("span", { class: `chip ${statusClass}`, text: T(statusText) }),
             info ? el("span", { class: `chip ${info.due ? "chip-diseased" : ""}`, text: info.text }) : null,
             severity && severity.grade
-              ? el("span", { class: `chip severity-${severity.grade}`, text: `Severity: ${severityText(severity)}` })
+              ? el("span", { class: `chip severity-${severity.grade}`, text: T("Severity: {text}", { text: severityText(severity) }) })
               : null,
-            trend ? el("span", { class: `chip trend-${trend.direction}`, text: TREND_TEXT[trend.direction] }) : null,
+            trend ? el("span", { class: `chip trend-${trend.direction}`, text: T(TREND_TEXT[trend.direction]) }) : null,
           ]),
         ]),
       ]),
@@ -631,14 +868,14 @@
         : null,
       c.awaiting_check_in
         ? el("div", { class: "current-step" }, [
-            el("p", { class: "result-eyebrow", text: `Current step ${step.number}` }),
+            el("p", { class: "result-eyebrow", text: T("Current step {n}", { n: step.number }) }),
             stepBody(step, true),
             checkInForm(c, step),
           ])
         : null,
       timeline(c),
       el("div", { class: "case-footer" }, [
-        el("button", { type: "button", class: "link-button danger", text: "Delete record", onclick: () => deleteCase(c) }),
+        el("button", { type: "button", class: "link-button danger", text: T("Delete record"), onclick: () => deleteCase(c) }),
       ]),
     ]);
   }
@@ -649,7 +886,8 @@
 
     const dueCases = user ? cases.filter(isDue) : [];
     const due = dueCases.length;
-    const dueTitle = due ? `${plural(due, "check")} due: ${dueCases.map((c) => c.display_name).join(", ")}` : "";
+    const checks = countText(due, "check");
+    const dueTitle = due ? `${T("{checks} due - tell us whether the treatment worked:", { checks })} ${dueCases.map((c) => c.display_name).join(", ")}` : "";
 
     dueCounts.forEach((badge) => {
       badge.textContent = String(due);
@@ -666,7 +904,7 @@
     });
 
     dueBanner.replaceChildren(
-      `${plural(due, "check")} due - tell us whether the treatment worked: `,
+      `${T("{checks} due - tell us whether the treatment worked:", { checks })} `,
       ...dueCases.flatMap((c, index) => [
         index ? ", " : "",
         el("a", { href: `#case-${c.id}`, class: "inline-link", text: c.display_name, onclick: (event) => focusCase(event, c.id) }),
@@ -701,26 +939,42 @@
     if (match) focusCase(null, match[1]);
   });
 
+  let casesToken = 0;
+
+  // English first (fast), then the chosen language when it differs.
   async function loadCases() {
+    const token = ++casesToken;
+
     if (!user) {
       cases = [];
       renderHistory();
       return;
     }
 
-    try {
-      cases = (await api("/cases")).cases;
-      historyError.classList.add("hidden");
-    } catch (err) {
-      if (err.status === 401) {
-        user = null;
-        renderAccount();
+    const lang = language();
+
+    for (const pass of lang === "en" ? ["en"] : ["en", lang]) {
+      historyTranslating.classList.toggle("hidden", pass === lang);
+      try {
+        const data = await api(`/cases?language=${encodeURIComponent(pass)}`);
+        if (token !== casesToken) return;
+        cases = data.cases;
+        historyError.classList.add("hidden");
+      } catch (err) {
+        if (token !== casesToken) return;
+        if (err.status === 401) {
+          user = null;
+          renderAccount();
+        }
+        historyError.textContent = err.message;
+        historyError.classList.remove("hidden");
+        renderHistory();
+        break;
       }
-      historyError.textContent = err.message;
-      historyError.classList.remove("hidden");
+      renderHistory();
     }
 
-    renderHistory();
+    if (token === casesToken) historyTranslating.classList.add("hidden");
   }
 
   /* ---------- account ---------- */
@@ -789,14 +1043,38 @@
     renderHistory();
   }
 
+  /* ---------- language ---------- */
+
+  async function onLanguageChange() {
+    stopSpeaking();
+    // The first switch to a language can take a few seconds (later ones are cached).
+    historyTranslating.classList.toggle("hidden", language() === "en");
+    await loadUiText();
+    applyStaticText();
+    renderHistory(); // labels right away, then translated case texts
+    loadCases();
+    renderPlanState();
+  }
+
   /* ---------- wiring ---------- */
 
   document.addEventListener("verdant:analysis", (event) => showPlan(event.detail.analysis, event.detail.file));
   document.addEventListener("verdant:reset", () => {
+    stopSpeaking();
     lastAnalysis = null;
     lastFile = null;
     hidePlan();
   });
+  // app.js fills the language list after its first request.
+  document.addEventListener("verdant:languages", onLanguageChange);
+
+  const languageSelect = $("languageSelect");
+  if (languageSelect) languageSelect.addEventListener("change", onLanguageChange);
+
+  planSpeakBtn.addEventListener("click", () => {
+    if (lastPlan) readAloud(planSpeakBtn, "/treatment-plan/speech", planRequest());
+  });
+  setSpeakState(planSpeakBtn, "idle");
 
   trackBtn.addEventListener("click", track);
   signInBtn.addEventListener("click", () => openAuth("login"));

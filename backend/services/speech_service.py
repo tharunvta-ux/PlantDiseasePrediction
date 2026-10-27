@@ -132,13 +132,31 @@ def speak_guidance(
         LLMError subclasses when guidance or speech generation fails.
     """
 
+    provider = _speech_provider()
+    parts = _speech_parts(predicted_class, level, alternatives, language, provider)
+
+    return _speak_part(parts, language, part, provider)
+
+
+def _speech_provider() -> Any:
     provider = get_llm_provider()
 
     if not hasattr(provider, "synthesize_speech"):
         raise LLMNotConfiguredError("The configured LLM provider has no text-to-speech.")
 
-    parts = _speech_parts(predicted_class, level, alternatives, language, provider)
+    return provider
 
+
+def speak_text(text: str, language: str, part: int = 0) -> Dict[str, Any]:
+    """
+    WAV audio of one part of a server-generated text (treatment steps,
+    case summaries). Callers must never pass client-supplied text.
+    """
+
+    return _speak_part(split_for_speech(text), language, part, _speech_provider())
+
+
+def _speak_part(parts: List[str], language: str, part: int, provider: Any) -> Dict[str, Any]:
     if not 0 <= part < len(parts):
         raise SpeechPartError(f"part must be between 0 and {len(parts) - 1}.")
 

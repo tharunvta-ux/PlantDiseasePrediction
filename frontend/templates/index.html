@@ -30,6 +30,12 @@
         <a href="{{ url_for('frontend.model_performance') }}">Model</a>
       </nav>
       <div class="nav-actions">
+        <label class="nav-lang" title="Language">
+          <span aria-hidden="true">🌐</span>
+          <select id="languageSelect" aria-label="Language">
+            <option value="en">English</option>
+          </select>
+        </label>
         <span id="accountEmail" class="account-email hidden"></span>
         <a href="#history" class="nav-history-mobile">History <span id="dueCountMobile" class="nav-count hidden"></span></a>
         <button id="signOutBtn" type="button" class="nav-button hidden">Sign out</button>
@@ -182,12 +188,6 @@
               <p id="fileName" class="file-name"></p>
               <p class="file-status">Ready to analyze</p>
             </div>
-            <label class="lang-picker">
-              <span>Guidance language</span>
-              <select id="languageSelect" aria-label="Language for AI guidance">
-                <option value="en">English</option>
-              </select>
-            </label>
             <div class="action-buttons">
               <button id="removeBtn" class="btn-outline btn-pill" type="button">Remove</button>
               <button id="predictBtn" class="btn-primary btn-pill" type="button">Predict disease</button>
@@ -346,8 +346,11 @@
     <!-- Step-by-step plan + start tracking -->
     <div id="planPanel" class="treatment-panel glass hidden" aria-live="polite">
       <div class="result-header">
-        <h3>What to do now</h3>
-        <span class="status-badge">Step 1</span>
+        <h3 data-i18n="What to do now">What to do now</h3>
+        <div class="header-actions">
+          <button id="planSpeakBtn" class="btn-outline btn-pill speak-btn hidden" type="button" aria-pressed="false">🔊 Read aloud</button>
+          <span class="status-badge" data-i18n="Step {n}" data-i18n-n="1">Step 1</span>
+        </div>
       </div>
       <div id="planStep"></div>
       <div id="planActions" class="plan-actions">
@@ -360,18 +363,19 @@
   <!-- Treatment history -->
   <section id="history" class="detect history">
     <div class="section-heading">
-      <h2>Treatment history</h2>
-      <p>Follow each problem step by step. When a check is due, tell us whether the step worked. If it did not, the next step is suggested, and an expert is suggested when nothing else is left.</p>
+      <h2 data-i18n="Treatment history">Treatment history</h2>
+      <p data-i18n="Follow each problem step by step. When a check is due, tell us whether the step worked. If it did not, the next step is suggested, and an expert is suggested when nothing else is left.">Follow each problem step by step. When a check is due, tell us whether the step worked. If it did not, the next step is suggested, and an expert is suggested when nothing else is left.</p>
     </div>
 
     <div id="historySignedOut" class="treatment-panel glass history-empty">
-      <p>Sign in to save treatments and track whether they work.</p>
-      <button id="historySignInBtn" class="btn-primary btn-pill" type="button">Sign in or create an account</button>
+      <p data-i18n="Sign in to save treatments and track whether they work.">Sign in to save treatments and track whether they work.</p>
+      <button id="historySignInBtn" class="btn-primary btn-pill" type="button" data-i18n="Sign in or create an account">Sign in or create an account</button>
     </div>
 
     <div id="historySignedIn" class="hidden">
+      <p id="historyTranslating" class="treatment-meta translating hidden" data-i18n="Translating…">Translating…</p>
       <div id="dueBanner" class="level-banner level-uncertain hidden" role="status"></div>
-      <p id="historyEmpty" class="treatment-note hidden">No treatments yet. Diagnose a plant above and press "Track this treatment".</p>
+      <p id="historyEmpty" class="treatment-note hidden" data-i18n='No treatments yet. Diagnose a plant above and press "Track this treatment".'>No treatments yet. Diagnose a plant above and press "Track this treatment".</p>
       <p id="historyError" class="result-error hidden"></p>
       <div id="caseList" class="case-list"></div>
     </div>
