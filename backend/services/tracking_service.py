@@ -43,6 +43,7 @@ from backend.services.treatment_plan_service import (
     StepPlan,
     expert_step,
     first_step,
+    is_ai_condition,
     is_trackable,
     next_step,
 )
@@ -231,8 +232,9 @@ def summarise_followup(analysis: Dict[str, Any]) -> Dict[str, Any]:
 
     diagnosis = analysis.get("diagnosis")
     identification = analysis.get("plant_identification") or {}
+    ai_condition = analysis.get("ai_condition")
 
-    return {
+    summary = {
         "route": analysis.get("route"),
         "message": analysis.get("message"),
         "plant_name": identification.get("plant_common_name") or None,
@@ -241,6 +243,18 @@ def summarise_followup(analysis: Dict[str, Any]) -> Dict[str, Any]:
         "confidence_level": diagnosis["confidence_level"] if diagnosis else None,
         "is_healthy": diagnosis["is_healthy"] if diagnosis else None,
     }
+
+    if not diagnosis and ai_condition:
+        # AI matches are never "high": switching treatment needs the
+        # grower's confirmation, which a check-in photo does not give.
+        summary.update(
+            predicted_class=ai_condition["id"],
+            display_name=ai_condition["display_name"],
+            confidence_level=LEVEL_UNCERTAIN,
+            is_healthy=False,
+        )
+
+    return summary
 
 
 def _step_history(case: TreatmentCase) -> List[Dict[str, Any]]:
@@ -294,8 +308,9 @@ def _apply_followup(case: TreatmentCase, followup: Dict[str, Any] | None) -> tup
             ], first_step(found, LEVEL_HIGH)
 
         return [
-            f"The new photo might show {followup.get('display_name')} instead, but the "
-            "model is not sure, so the current plan continues."
+            f"The new photo might show {followup.get('display_name')} instead, but this "
+            "is not certain, so the current plan continues. Mention it to an expert "
+            "if the problem stays."
         ], None
 
     if level == LEVEL_HIGH and case.confidence_level != LEVEL_HIGH:
@@ -448,6 +463,13 @@ def case_to_dict(case: TreatmentCase) -> Dict[str, Any]:
         "predicted_class": case.predicted_class,
         "display_name": case.display_name,
         "confidence_level": case.confidence_level,
+        # model = trained CNN; ai_match = AI-matched TNAU condition (high =
+        # confirmed by the grower); ai_observation = general AI advice only
+        "diagnosis_source": (
+            "ai_observation"
+            if case.predicted_class is None
+            else "ai_match" if is_ai_condition(case.predicted_class) else "model"
+        ),
         "created_at": iso(case.created_at),
         "updated_at": iso(case.updated_at),
         "photo_url": f"/cases/{case.id}/photo",

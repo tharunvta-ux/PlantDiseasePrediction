@@ -14,7 +14,9 @@ crop_mismatch      LLM names a different crop than the CNN (or says the
                    LLM's view and the CNN's best match within the LLM's
                    crop are shown as notes.
 unsupported_plant  LLM is highly confident it is a plant the CNN was not
-                   trained on -> no CNN diagnosis; LLM observation.
+                   trained on (or matched a known TNAU condition of such
+                   a crop) -> no CNN diagnosis; LLM observation, plus
+                   "ai_condition" when a known condition was matched.
 not_plant          Not a plant -> no diagnosis.
 unverified         Identification unavailable (LLM down / no key)
                    -> CNN result as before, flagged as unverified.
@@ -41,6 +43,7 @@ from backend.services.languages import DEFAULT_LANGUAGE
 from backend.services.llm import LLMError
 from backend.services.plant_identification_service import NOT_SUPPORTED, identify_plant
 from backend.services.prediction_service import PredictionRun, run_prediction
+from backend.services.treatment_plan_service import ai_condition_summary
 
 logger = logging.getLogger(__name__)
 
@@ -135,13 +138,18 @@ def combine_results(
     notes: List[str] = []
     diagnosis: Dict[str, Any] | None
     llm_observation = False
+    # A TNAU-covered disease of a crop the CNN does not know, as matched
+    # by the vision LLM; the grower confirms it before any product is shown.
+    ai_condition: Dict[str, Any] | None = None
+    matched = identification and identification.get("matched_condition", NOT_SUPPORTED)
+    matched = matched if matched and matched != NOT_SUPPORTED else None
 
     if identification is None:
         route = ROUTE_UNVERIFIED
         diagnosis = _diagnosis_from_prediction(prediction, "cnn")
         notes.append(
-            "The plant type could not be verified, so the model assumes this "
-            "is a leaf of one of its 14 supported crops."
+            "The plant could not be identified right now, so this result assumes "
+            "it is one of the crops the disease model knows."
         )
         message = prediction["message"]
 
@@ -153,19 +161,29 @@ def combine_results(
             "of a plant leaf."
         )
 
-    elif (
-        identification["supported_crop"] == NOT_SUPPORTED
-        and identification["identification_confidence"] == "high"
+    elif identification["supported_crop"] == NOT_SUPPORTED and (
+        identification["identification_confidence"] == "high" or matched
     ):
         route = ROUTE_UNSUPPORTED
         diagnosis = None
         llm_observation = True
-        name = identification["plant_common_name"] or "This plant"
-        message = (
-            f"{name} is not one of the 14 crops our disease model was trained "
-            "on, so no model diagnosis is shown. Below is an AI observation "
-            "of the photo - it is unverified; consult a local expert."
-        )
+        name = identification["plant_common_name"] or "plant"
+
+        if matched:
+            ai_condition = ai_condition_summary(matched)
+            message = (
+                f"This looks like {name} with signs of "
+                f"{ai_condition['disease'].lower()} - see below."
+            )
+        else:
+            message = {
+                "yes": f"This looks like a healthy {name}.",
+                "no": f"This looks like {name} with a possible problem - see the AI check below.",
+            }.get(
+                identification["appears_healthy"],
+                f"This looks like {name}. The AI could not tell clearly whether it is "
+                "healthy - see the AI check below.",
+            )
 
     else:
         crop = identification["supported_crop"]
@@ -220,6 +238,7 @@ def combine_results(
         "show_llm_observation": bool(llm_observation and identification and identification["is_plant"]),
         "prediction": prediction,
         "plant_identification": identification,
+        "ai_condition": ai_condition,
         "identification_error": (
             {"code": identification_error.code, "message": identification_error.public_message}
             if identification_error

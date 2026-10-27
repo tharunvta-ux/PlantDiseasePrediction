@@ -84,6 +84,13 @@ crop for 15 of 20 test images (e.g. tomato leaves called potato).
   (captafol, tridemorph, antibiotic sprays such as streptocycline) are
   left out; see `_meta.excluded_from_tnau`. The plan file has **not been
   reviewed by an agronomist** yet.
+- **Other crops** (`backend/knowledge/ai_condition_plans.json`): TNAU
+  plans for 20 diseases of papaya, banana, mango, brinjal, chilli, rice,
+  coconut and groundnut. Gemini may match a photo to one of them
+  (`ai_condition` in the `/analyze` response). The grower is shown TNAU's
+  symptom description and asked "Does your plant look like this?":
+  *Yes* gives the TNAU treatment, *Not sure* gives care steps first,
+  *No* gives general care.
 - **Accounts + history** (`/auth/*`, `/cases*`): sign in with email and
   password and track a plan. Each step has a "check again on" date.
   At the check the grower ticks *It worked* (case closed with a positive

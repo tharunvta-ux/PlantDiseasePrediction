@@ -30,6 +30,7 @@ from backend.services.llm import (
     get_llm_provider,
 )
 from backend.services.recommendation_service import DOSAGE_PATTERN, LRUCache
+from backend.services.treatment_plan_service import ai_condition_ids, ai_condition_summary
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,13 @@ class PlantIdentification(BaseModel):
         description="Low-risk, general care steps. No product names, no doses."
     )
     image_notes: str = Field(description="Short note on photo quality or framing problems, or empty string.")
+    matched_condition: str = Field(
+        default=NOT_SUPPORTED,
+        description=(
+            "Id of the listed known condition whose symptoms are clearly visible, "
+            "or 'none'."
+        ),
+    )
 
 
 SYSTEM_PROMPT = """\
@@ -85,6 +93,10 @@ possibilities ("possibly ...", "could be ..."), not diagnoses.
 5. General advice must be low-risk (inspection, hygiene, watering, \
 removing affected parts, getting expert confirmation). NEVER give product \
 or brand names, doses, rates or mixing ratios.
+6. matched_condition: only when supported_crop is "none", the plant is the \
+crop of one of the listed known conditions, and that condition's \
+symptoms are clearly visible in the photo, set its id. Never pick one \
+from the crop alone or for a healthy-looking plant; otherwise "none".
 
 If it is not a plant: is_plant=false, supported_crop="none", empty lists.
 Respond only with JSON matching the schema.
@@ -92,12 +104,27 @@ Respond only with JSON matching the schema.
 
 
 def build_schema(supported_crops: Sequence[str]) -> Dict[str, Any]:
-    """JSON schema with supported_crop restricted to the allowed values."""
+    """JSON schema with supported_crop / matched_condition restricted."""
 
     schema = PlantIdentification.model_json_schema()
     schema["properties"]["supported_crop"]["enum"] = [*supported_crops, NOT_SUPPORTED]
+    schema["properties"]["matched_condition"]["enum"] = [*ai_condition_ids(), NOT_SUPPORTED]
+    schema.setdefault("required", [])
+    if "matched_condition" not in schema["required"]:
+        schema["required"].append("matched_condition")
 
     return schema
+
+
+def known_conditions_text() -> str:
+    """Prompt lines describing the conditions the app has TNAU plans for."""
+
+    lines = []
+    for key in ai_condition_ids():
+        summary = ai_condition_summary(key)
+        lines.append(f'- "{key}": {summary["display_name"]}. Signs: {summary["symptoms"]}')
+
+    return "\n".join(lines)
 
 
 def prepare_image(image_path: str) -> ImageInput:
@@ -168,6 +195,7 @@ def identify_plant(
     response = provider.generate_json(
         SYSTEM_PROMPT,
         f"Allowed supported_crop values: {crops_text}, \"{NOT_SUPPORTED}\".\n"
+        f"Known conditions for matched_condition:\n{known_conditions_text()}\n"
         "Identify the plant in this photo. Keep plant_common_name in English. "
         "For visible_symptoms, possible_issues, general_advice and image_notes: "
         f"{language_instruction(language)}",
@@ -184,6 +212,15 @@ def identify_plant(
     result = parsed.model_dump()
     result["supported_crop"] = (
         _normalise_crop(parsed.supported_crop, supported_crops) if parsed.is_plant else NOT_SUPPORTED
+    )
+    # A known condition only for non-model crops that do not look healthy.
+    result["matched_condition"] = (
+        parsed.matched_condition
+        if parsed.is_plant
+        and result["supported_crop"] == NOT_SUPPORTED
+        and parsed.appears_healthy != "yes"
+        and parsed.matched_condition in ai_condition_ids()
+        else NOT_SUPPORTED
     )
 
     removed = 0

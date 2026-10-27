@@ -11,6 +11,7 @@
 
   const planPanel = $("planPanel");
   const planStep = $("planStep");
+  const planActions = $("planActions");
   const trackBtn = $("trackBtn");
   const trackNote = $("trackNote");
 
@@ -218,9 +219,69 @@
     lastFile = file;
     hidePlan();
 
-    const fields = diagnosisFields(analysis);
-    if (!fields) return;
+    if (analysis.ai_condition && analysis.route === "unsupported_plant") {
+      askToConfirm(analysis);
+      return;
+    }
 
+    const fields = diagnosisFields(analysis);
+    if (fields) await loadPlan(analysis, fields);
+  }
+
+  /* An AI-matched disease of a crop the disease model does not cover:
+   * TNAU products are only shown after the grower confirms the symptoms. */
+  function askToConfirm(analysis) {
+    const condition = analysis.ai_condition;
+    const id = analysis.plant_identification || {};
+    const plantName = id.plant_common_name || condition.crop;
+
+    const ANSWERS = {
+      yes: "You said your plant looks like this.",
+      unsure: "You were not sure, so only safe care steps are shown first.",
+      no: "You said it does not look like this, so general care steps are shown.",
+    };
+
+    function answer(choice) {
+      const fields =
+        choice === "no"
+          ? { predicted_class: "", confidence_level: "", plant_name: plantName, general_advice: id.general_advice || [] }
+          : { predicted_class: condition.id, confidence_level: choice === "yes" ? "high" : "uncertain", plant_name: plantName };
+
+      const intro = el("p", { class: "match-answer" }, [
+        `${condition.display_name}: ${ANSWERS[choice]} `,
+        el("button", { type: "button", class: "link-button", text: "Change answer", onclick: () => askToConfirm(analysis) }),
+      ]);
+
+      loadPlan(analysis, fields, intro);
+    }
+
+    const button = (choice, text, cls) =>
+      el("button", { type: "button", class: `${cls} btn-pill`, text, onclick: () => answer(choice) });
+
+    lastPlan = null;
+    planStep.replaceChildren(
+      el("div", { class: "match-card" }, [
+        el("p", { class: "result-eyebrow", text: "Possible match found by AI" }),
+        el("h4", { class: "step-title", text: condition.display_name }),
+        el("p", { class: "step-reason", text: "How TNAU describes it:" }),
+        el("p", { class: "match-symptoms", text: condition.symptoms }),
+        el("p", { class: "checkin-question", text: "Does your plant look like this?" }),
+        el("div", { class: "match-buttons" }, [
+          button("yes", "Yes, it looks like this", "btn-primary"),
+          button("unsure", "Not sure", "btn-outline"),
+          button("no", "No", "btn-outline"),
+        ]),
+        el("p", { class: "treatment-meta" }, [
+          condition.has_products ? "TNAU lists a treatment for this; it is shown after you confirm. " : "",
+          el("a", { href: condition.source_url, target: "_blank", rel: "noopener", class: "inline-link", text: "TNAU page with photos" }),
+        ]),
+      ])
+    );
+    planActions.classList.add("hidden");
+    planPanel.classList.remove("hidden");
+  }
+
+  async function loadPlan(analysis, fields, intro = null) {
     let data;
     try {
       data = await postJson("/treatment-plan", fields);
@@ -231,7 +292,8 @@
     if (analysis !== lastAnalysis || !data.trackable || !data.step) return;
 
     lastPlan = { fields, step: data.step };
-    planStep.replaceChildren(stepBody(data.step));
+    planStep.replaceChildren(...[intro, stepBody(data.step)].filter(Boolean));
+    planActions.classList.remove("hidden");
 
     const meta = data.meta || {};
     trackNote.textContent =
@@ -286,6 +348,14 @@
   };
 
   const LEVEL = { high: "high confidence", uncertain: "uncertain" };
+  const AI_MATCH_LEVEL = { high: "AI match, confirmed by you", uncertain: "AI match, not confirmed" };
+
+  function diagnosisLabel(c) {
+    if (!c.confidence_level) return "";
+    const labels = c.diagnosis_source === "ai_match" ? AI_MATCH_LEVEL : LEVEL;
+    const text = labels[c.confidence_level] || c.confidence_level;
+    return c.diagnosis_source === "ai_match" ? ` · ${text}` : ` · diagnosis ${text}`;
+  }
 
   function latestFeedback(c) {
     const steps = c.steps;
@@ -436,8 +506,7 @@
           el("h3", { text: c.display_name }),
           el("p", {
             class: "treatment-meta",
-            text: `${c.plant_name} · started ${formatDate(c.created_at)} · step ${step.number}` +
-              (c.confidence_level ? ` · diagnosis ${LEVEL[c.confidence_level] || c.confidence_level}` : ""),
+            text: `${c.plant_name} · started ${formatDate(c.created_at)} · step ${step.number}` + diagnosisLabel(c),
           }),
           el("div", { class: "result-chips" }, [
             el("span", { class: `chip ${statusClass}`, text: statusText }),

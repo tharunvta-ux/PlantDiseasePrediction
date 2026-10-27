@@ -49,7 +49,7 @@ from backend.services.tracking_service import (
     validate_case_request,
     validate_outcome,
 )
-from backend.services.treatment_plan_service import plan_meta
+from backend.services.treatment_plan_service import ai_condition_ids, plan_meta
 
 tracking_bp = Blueprint("tracking", __name__)
 
@@ -76,7 +76,7 @@ def _diagnosis_fields(source) -> dict:
         source.get("confidence_level") or None,
         source.get("plant_name"),
         advice,
-        get_predictor().class_names,
+        [*get_predictor().class_names, *ai_condition_ids()],
     )
 
 

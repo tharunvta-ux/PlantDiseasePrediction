@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verdant — AI Plant Disease Detection</title>
-  <meta name="description" content="Upload a leaf photo to get an AI disease prediction with confidence levels and AI-generated treatment guidance." />
+  <meta name="description" content="Photograph any plant to identify it, check its health, get step-by-step treatment advice and track recovery." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" />
   <link rel="stylesheet" href="{{ url_for('frontend.static', filename='css/style.css') }}" />
@@ -44,13 +44,13 @@
     <div class="hero-grid">
       <div>
         <span class="badge">
-          <span class="badge-dot"></span> AI plant ID · disease model for 14 crops · 38 leaf classes
+          <span class="badge-dot"></span> Any plant · in-depth disease check for 14 major crops
         </span>
         <h1 class="hero-title">
-          Check plant leaves <span class="gradient-text">for disease.</span>
+          Know your plant. <span class="gradient-text">Heal it.</span>
         </h1>
         <p class="hero-copy">
-          Upload a photo of a leaf to get a disease prediction with an honest confidence level and AI‑generated treatment guidance — from a CNN trained on the PlantVillage leaf dataset.
+          Take a photo of any plant to find out what it is, whether it is healthy and what to do next — then track the treatment step by step until it recovers.
         </p>
         <div class="hero-cta">
           <a href="#detect" class="btn-primary btn-pill">Detect now</a>
@@ -58,23 +58,20 @@
         </div>
         <div class="hero-stats">
           <div class="stat">
-            <div class="stat-value">93%</div>
-            <div class="stat-label">Accuracy on lab images*</div>
+            <div class="stat-value">Any plant</div>
+            <div class="stat-label">Identified by AI</div>
           </div>
           <div class="stat-divider"></div>
           <div class="stat">
-            <div class="stat-value">38</div>
-            <div class="stat-label">Leaf classes</div>
+            <div class="stat-value">TNAU</div>
+            <div class="stat-label">Treatment source</div>
           </div>
           <div class="stat-divider"></div>
           <div class="stat">
-            <div class="stat-value">14</div>
-            <div class="stat-label">Crops</div>
+            <div class="stat-value">12</div>
+            <div class="stat-label">Languages</div>
           </div>
         </div>
-        <p class="hero-footnote">
-          *Held-out PlantVillage validation images (lab photos, plain backgrounds). Accuracy on real-world field photos has not been measured and is expected to be lower.
-        </p>
       </div>
 
       <div class="hero-visual">
@@ -264,8 +261,8 @@
     <!-- AI plant observation (vision LLM, unverified) -->
     <div id="observationPanel" class="treatment-panel glass hidden" aria-live="polite">
       <div class="result-header">
-        <h3>AI plant observation</h3>
-        <span class="status-badge badge-warn">Unverified</span>
+        <h3>AI photo check</h3>
+        <span class="status-badge">AI-generated</span>
       </div>
       <p id="obsIntro" class="treatment-meaning"></p>
       <div class="treatment-grid">
@@ -353,7 +350,7 @@
         <span class="status-badge">Step 1</span>
       </div>
       <div id="planStep"></div>
-      <div class="plan-actions">
+      <div id="planActions" class="plan-actions">
         <button id="trackBtn" class="btn-primary btn-pill" type="button">Track this treatment</button>
         <p id="trackNote" class="treatment-meta"></p>
       </div>

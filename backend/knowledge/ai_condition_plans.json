@@ -1,0 +1,285 @@
+{
+  "_meta": {
+    "purpose": "Treatment plans for diseases of crops the CNN does not cover. Gemini may match a photo to one of these conditions; the grower must confirm the symptoms ('Does your plant look like this?') before any product is shown. Products and doses come only from the linked TNAU pages.",
+    "source": "TNAU Agritech Portal - Crop Protection, https://agritech.tnau.ac.in/crop_protection/",
+    "checked_on": "2026-10-27",
+    "expert_reviewed": false,
+    "excluded_from_tnau": [
+      {"chemical": "Dinocap (Karathane)", "listed_for": "Mango, papaya and chilli powdery mildew", "reason": "Banned in India (Insecticides (Prohibition) Order, 2023)."},
+      {"chemical": "Tridemorph", "listed_for": "Mango and papaya powdery mildew, groundnut rust, coconut leaf blight", "reason": "Banned in India (2018)."},
+      {"chemical": "Benomyl", "listed_for": "Mango anthracnose (post-harvest dip)", "reason": "Banned in India (2018)."},
+      {"chemical": "Carbofuran 3G", "listed_for": "Chilli virus vectors", "reason": "Extremely hazardous soil insecticide; not suggested by this app."},
+      {"chemical": "Methyl demeton", "listed_for": "Mango sooty mould insects", "reason": "Current registration status not verified."},
+      {"chemical": "Edifenphos, Iprobenphos", "listed_for": "Rice blast and brown spot", "reason": "Current registration status not verified; other listed options are shown."},
+      {"chemical": "Chinomethionate", "listed_for": "Papaya powdery mildew", "reason": "Current registration status not verified."},
+      {"chemical": "Streptomycin + tetracycline", "listed_for": "Rice bacterial leaf blight", "reason": "Antibiotics; draft ban on agricultural use (Dec 2021). Not suggested."},
+      {"chemical": "Fernoxone (2,4-D) injection", "listed_for": "Banana bunchy top (killing infected plants)", "reason": "Herbicide injection; the plan says to uproot infected plants instead."}
+    ]
+  },
+  "conditions": {
+    "Papaya___Powdery_mildew": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/papaya_diseases_2.html",
+      "pathogen_type": "fungal",
+      "symptoms": "White powdery growth on the upper side of leaves, flower stalks and fruit; severe attack makes leaves yellow and drop.",
+      "care": ["Remove badly affected leaves and destroy them.", "Give plants enough spacing for air movement."],
+      "products": [
+        {"name": "Wettable sulphur", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M02"}
+      ],
+      "wait_days": 7
+    },
+    "Papaya___Ring_spot_virus": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/papaya_diseases_3.html",
+      "pathogen_type": "viral",
+      "symptoms": "Vein clearing, puckering and mottled, distorted leaves; circular concentric rings on the fruit.",
+      "care": [
+        "Uproot affected plants immediately - virus-infected plants do not recover.",
+        "Do not grow cucurbits (pumpkin, gourds, cucumber) around the field.",
+        "For new plantings: raise seedlings under insect-proof net and grow sorghum or maize as a barrier crop first."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Papaya___Leaf_curl_virus": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/papaya_diseases_4.html",
+      "pathogen_type": "viral",
+      "symptoms": "Leaves curl, crinkle and roll inward and downward, become small and brittle; plants are stunted with no flowers or fruit.",
+      "care": [
+        "Uproot affected plants - infected plants do not recover.",
+        "Do not grow tomato or tobacco near papaya (they share the virus).",
+        "Ask a local expert which insecticide is approved to control the whiteflies that spread it."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Banana___Yellow_sigatoka": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/banana_diseases/crop_prot_crop%20diseases_fruits_banana_8.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Oval leaf spots with light grey centres and a yellow halo that merge into large dried patches; leaves dry quickly.",
+      "care": [
+        "Remove and destroy affected leaves.",
+        "Keep the field weed-free and remove extra suckers on time.",
+        "Provide drainage - waterlogging favours the disease.",
+        "TNAU: spray 3 times at 10-15 day intervals from the first leaf specks, with a sticking agent (e.g. teepol)."
+      ],
+      "products": [
+        {"name": "Propiconazole", "dose": "0.1% (1 ml per litre of water)", "kind": "fungicide", "group": "FRAC 3"},
+        {"name": "Carbendazim", "dose": "0.1% (1 g per litre of water)", "kind": "fungicide", "group": "FRAC 1"},
+        {"name": "Mancozeb", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M03"}
+      ],
+      "wait_days": 12
+    },
+    "Banana___Bunchy_top_virus": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/banana_diseases/crop_prot_crop%20diseases_fruits_banana_3.html",
+      "pathogen_type": "viral",
+      "symptoms": "Dark green streaks along the leaf veins and midrib; new leaves are short, narrow and bunched at the top of the plant.",
+      "care": [
+        "Uproot and destroy infected plants (with their suckers) - they do not recover.",
+        "Keep the field clean and weed-free so new infections are seen early.",
+        "Use only virus-free planting material for new plants."
+      ],
+      "products": [],
+      "wait_days": 7
+    },
+    "Mango___Powdery_mildew": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/mango_2.html",
+      "pathogen_type": "fungal",
+      "symptoms": "White powdery growth on flowers, young leaves and small fruit; infected leaves and pea-sized fruit drop.",
+      "care": [
+        "Remove and destroy badly affected flower panicles and leaves.",
+        "TNAU: first spray soon after flowering and a second one 15 days later."
+      ],
+      "products": [
+        {"name": "Wettable sulphur", "dose": "0.2% (2 g per litre of water)", "kind": "fungicide", "group": "FRAC M02"},
+        {"name": "Carbendazim", "dose": "0.1% (1 g per litre of water)", "kind": "fungicide", "group": "FRAC 1"}
+      ],
+      "wait_days": 15
+    },
+    "Mango___Red_rust": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/mango_5.html",
+      "pathogen_type": "algal",
+      "symptoms": "Rusty red, slightly raised circular spots on leaves and young twigs that join into irregular patches.",
+      "care": ["Prune out badly affected twigs.", "Prune to let light and air into the canopy."],
+      "products": [
+        {"name": "Copper oxychloride", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M01"},
+        {"name": "Bordeaux mixture", "dose": "0.6%", "kind": "fungicide", "group": "FRAC M01"}
+      ],
+      "wait_days": 15
+    },
+    "Mango___Anthracnose": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/mango_1.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Small blister-like dark spots on leaves and twigs; young leaves and tender twigs wither and die back; black spots on fruit.",
+      "care": [
+        "Prune out dead twigs and remove fallen infected leaves.",
+        "For fruit: TNAU recommends a hot-water dip (50-55°C for 15 minutes) before storage."
+      ],
+      "products": [
+        {"name": "Pseudomonas fluorescens (FP 7)", "dose": "5 g per litre of water, every 3 weeks from October", "kind": "biological fungicide", "group": "biological"}
+      ],
+      "wait_days": 21
+    },
+    "Brinjal___Cercospora_leaf_spot": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/brinjal_diseases_2.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Yellowish angular to irregular leaf spots that turn greyish-brown; badly affected leaves drop early.",
+      "care": ["Remove and destroy affected leaves.", "TNAU: the variety Pant Samrat resists both brinjal leaf spots."],
+      "products": [
+        {"name": "Copper oxychloride", "dose": "2 g per litre of water", "kind": "fungicide", "group": "FRAC M01"},
+        {"name": "Bordeaux mixture", "dose": "1%", "kind": "fungicide", "group": "FRAC M01"},
+        {"name": "Zineb", "dose": "2.5 g per litre of water", "kind": "fungicide", "group": "FRAC M03"}
+      ],
+      "wait_days": 7
+    },
+    "Brinjal___Alternaria_leaf_spot": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/brinjal_diseases_3.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Irregular brown leaf spots 4-8 mm wide, often with rings, that join to cover large parts of the leaf.",
+      "care": ["Remove and destroy affected leaves.", "Water at the base of the plant, not over the leaves."],
+      "products": [
+        {"name": "Mancozeb", "dose": "2 g per litre of water", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Copper oxychloride", "dose": "2 g per litre of water", "kind": "fungicide", "group": "FRAC M01"}
+      ],
+      "wait_days": 7
+    },
+    "Chilli___Fruit_rot_and_die_back": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/chilli_diseases_2.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Tender twigs dry from the tip backwards (die-back); sunken, dark spots and rot on the fruit.",
+      "care": [
+        "Cut out dried twigs and remove rotting fruit.",
+        "Next crop: use disease-free seed (TNAU: seed treatment with captan 4 g per kg of seed).",
+        "TNAU timing: spray just before flowering, at fruit formation, and a fortnight later."
+      ],
+      "products": [
+        {"name": "Ziram", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Captan", "dose": "0.2% (2 g per litre of water)", "kind": "fungicide", "group": "FRAC M04"},
+        {"name": "Copper oxychloride", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M01"}
+      ],
+      "wait_days": 14
+    },
+    "Chilli___Powdery_mildew": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/chilli_diseases_3.html",
+      "pathogen_type": "fungal",
+      "symptoms": "White powdery growth on the underside of leaves; leaves drop.",
+      "care": ["Remove badly affected leaves.", "TNAU: three sprays at 15-day intervals from the first symptoms."],
+      "products": [
+        {"name": "Wettable sulphur", "dose": "3 g per litre of water", "kind": "fungicide", "group": "FRAC M02"},
+        {"name": "Carbendazim", "dose": "1 g per litre of water", "kind": "fungicide", "group": "FRAC 1"}
+      ],
+      "wait_days": 15
+    },
+    "Chilli___Cercospora_leaf_spot": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/chilli_diseases_5.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Brown circular leaf spots with light grey centres and dark brown margins; badly infected leaves fall early.",
+      "care": ["Remove and destroy affected leaves.", "TNAU: spray twice at 10-15 day intervals."],
+      "products": [
+        {"name": "Mancozeb", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Chlorothalonil", "dose": "0.1% (1 g per litre of water)", "kind": "fungicide", "group": "FRAC M05"}
+      ],
+      "wait_days": 12
+    },
+    "Chilli___Leaf_curl_virus": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/chilli_diseases_7.html",
+      "pathogen_type": "viral",
+      "symptoms": "Leaves curl towards the midrib and become deformed; plants are stunted and flower buds drop.",
+      "care": [
+        "Uproot and destroy infected plants - they do not recover.",
+        "Grow 2-3 rows of maize or sorghum around the field to limit insects that spread the virus.",
+        "Next crop: use healthy seed and cover nursery beds with nylon net."
+      ],
+      "products": [
+        {"name": "Dimethoate", "dose": "2 ml per litre of water", "kind": "insecticide (virus vectors)", "group": "IRAC 1B"},
+        {"name": "Acephate", "dose": "1 g per litre of water", "kind": "insecticide (virus vectors)", "group": "IRAC 1B"}
+      ],
+      "wait_days": 7
+    },
+    "Rice___Blast": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/rice_diseases/rice_1.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Spindle-shaped leaf spots with grey centres and dark brown edges (starting as small bluish-green flecks) that can merge and dry the leaf.",
+      "care": [
+        "Remove weed hosts from bunds and channels.",
+        "Avoid excess nitrogen fertiliser.",
+        "Next crop: TNAU resistant varieties include CO 51, CO 52, CO 53, ASD 18 and IR 64."
+      ],
+      "products": [
+        {"name": "Tricyclazole 75% WP", "dose": "200 g per acre", "kind": "fungicide", "group": "FRAC 16.1"},
+        {"name": "Azoxystrobin + Difenoconazole", "dose": "100 ml per acre", "kind": "fungicide", "group": "FRAC 11 + 3"},
+        {"name": "Carbendazim", "dose": "100 g per acre", "kind": "fungicide", "group": "FRAC 1"}
+      ],
+      "wait_days": 10
+    },
+    "Rice___Brown_spot": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/rice_diseases/rice_2.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Oval, dark brown spots with a yellow halo on the leaves (like sesame seeds); spots join and the leaf dries.",
+      "care": [
+        "Remove infected debris and weed hosts from the field.",
+        "Use slow-release nitrogen fertiliser.",
+        "TNAU: spray when the disease reaches grade 3; repeat after 15 days if needed."
+      ],
+      "products": [
+        {"name": "Mancozeb", "dose": "500 g per acre", "kind": "fungicide", "group": "FRAC M03"}
+      ],
+      "wait_days": 15
+    },
+    "Rice___Sheath_rot": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/rice_diseases/rice_5.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Greyish-brown spots on the uppermost leaf sheath around the young panicle; the panicle rots or does not emerge fully.",
+      "care": [
+        "TNAU: apply gypsum 200 kg per acre in two splits.",
+        "Botanical option: spray neem oil 3% at boot leaf stage and 15 days later.",
+        "Next crop: moderately resistant varieties CO 55 or ADT 59."
+      ],
+      "products": [
+        {"name": "Thiophanate methyl 70% WP", "dose": "500 g per acre (foliar spray)", "kind": "fungicide", "group": "FRAC 1"},
+        {"name": "Hexaconazole 0.5% GR", "dose": "4 kg per acre (soil application at tillering)", "kind": "fungicide", "group": "FRAC 3"}
+      ],
+      "wait_days": 15
+    },
+    "Coconut___Leaf_blight": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/coconut_diseases_3.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Leaflets dry from the tip downwards and look charred or burnt.",
+      "care": [
+        "Remove and destroy severely affected leaves.",
+        "TNAU: apply 200 g Pseudomonas fluorescens with 50 kg farmyard manure and 5 kg neem cake per palm per year.",
+        "TNAU timing: 2 sprays at a 45-day interval during summer."
+      ],
+      "products": [
+        {"name": "Copper oxychloride", "dose": "0.25% (2.5 g per litre of water)", "kind": "fungicide", "group": "FRAC M01"},
+        {"name": "Bordeaux mixture", "dose": "1%", "kind": "fungicide", "group": "FRAC M01"}
+      ],
+      "wait_days": 45
+    },
+    "Coconut___Bud_rot": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/coconut_diseases_2.html",
+      "pathogen_type": "oomycete",
+      "symptoms": "The youngest one or two leaves turn yellow and droop; the crown rots into a foul-smelling mass, mostly in the monsoon.",
+      "care": [
+        "Act quickly - bud rot kills the palm. TNAU: remove all affected tissue from the crown, then drench the crown and cover the cut area with Bordeaux paste, protected from rain.",
+        "Spray the crowns of neighbouring palms as a precaution.",
+        "Provide good drainage and avoid overcrowded planting."
+      ],
+      "products": [
+        {"name": "Copper oxychloride", "dose": "0.25% (2.5 g per litre of water), crown drench", "kind": "fungicide", "group": "FRAC M01"},
+        {"name": "Bordeaux mixture", "dose": "1% spray on neighbouring palms", "kind": "fungicide", "group": "FRAC M01"}
+      ],
+      "wait_days": 14
+    },
+    "Groundnut___Rust": {
+      "source_url": "https://agritech.tnau.ac.in/crop_protection/groundnut_diseases/groundnut_d3.html",
+      "pathogen_type": "fungal",
+      "symptoms": "Orange-brown pustules, first on the underside of the leaves; badly infected leaves dry up but stay on the plant.",
+      "care": ["Remove volunteer groundnut plants and crop debris.", "TNAU: repeat the spray 15 days later if needed."],
+      "products": [
+        {"name": "Mancozeb", "dose": "1000 g per hectare", "kind": "fungicide", "group": "FRAC M03"},
+        {"name": "Chlorothalonil", "dose": "1000 g per hectare", "kind": "fungicide", "group": "FRAC M05"},
+        {"name": "Wettable sulphur", "dose": "2500 g per hectare", "kind": "fungicide", "group": "FRAC M02"}
+      ],
+      "wait_days": 15
+    }
+  }
+}
