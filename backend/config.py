@@ -57,14 +57,20 @@ DEFAULT_DATABASE_URL = f"sqlite:///{(PROJECT_ROOT / 'instance' / 'verdant.db').a
 # /pricing on 2026-09-30: stable model with a free API tier.
 DEFAULT_LLM_MODEL = "gemini-3.8-flash"
 
-# Used once when the primary model is overloaded (503) or rate-limited
-# (429). Also free tier; set LLM_FALLBACK_MODEL= (empty) to disable.
-DEFAULT_LLM_FALLBACK_MODEL = "gemini-3.5-flash-lite"
+# Tried in order when the previous model is overloaded (503),
+# rate-limited (429) or retired (404). Free-tier quotas are per model
+# (e.g. 20 requests/day for gemini-3.8-flash), so every free model in the
+# chain adds its own daily allowance. All are on the free tier and were
+# tested with JSON output on 2026-10-27; the preview model is last
+# because previews can be retired. Comma-separated; empty disables.
+DEFAULT_LLM_FALLBACK_MODEL = (
+    "gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash-preview"
+)
 
 # Text-to-speech (read-aloud in languages devices often lack voices for).
-# Both have a free tier and support all app languages (verified 2026-10-06).
+# All have a free tier (verified 2026-10-27).
 DEFAULT_TTS_MODEL = "gemini-3.8-flash-lite-tts"
-DEFAULT_TTS_FALLBACK_MODEL = "gemini-3.8-flash-tts"
+DEFAULT_TTS_FALLBACK_MODEL = "gemini-3.8-flash-tts,gemini-3.1-flash-tts-preview"
 
 
 def _env_float(name: str, default: float) -> float:

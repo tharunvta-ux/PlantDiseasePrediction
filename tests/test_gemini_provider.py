@@ -158,7 +158,7 @@ def _failing_primary(status, calls):
     return generate
 
 
-@pytest.mark.parametrize("status", [503, 429])
+@pytest.mark.parametrize("status", [503, 429, 404])
 def test_falls_back_when_primary_overloaded(status):
     provider = make_provider(fallback_model="gemini-fallback")
     calls = []
@@ -170,7 +170,66 @@ def test_falls_back_when_primary_overloaded(status):
     assert response.model == "gemini-fallback"
 
 
-@pytest.mark.parametrize("status", [400, 401, 402, 404, 500])
+def test_walks_the_whole_chain_and_skips_exhausted_models():
+    provider = make_provider(fallback_model="gemini-b, gemini-c,gemini-test")
+    calls = []
+
+    def generate(**kwargs):
+        calls.append(kwargs["model"])
+        if kwargs["model"] != "gemini-c":
+            raise errors.APIError(429, {"error": {"message": "Quota exceeded. Please retry in 16h49m49.5s.", "status": "X"}})
+        return SimpleNamespace(text='{"a": "b"}')
+
+    _stub(provider, generate)
+
+    assert provider.models == ["gemini-test", "gemini-b", "gemini-c"]
+    assert provider.generate_json("s", "u", SCHEMA).model == "gemini-c"
+    assert calls == ["gemini-test", "gemini-b", "gemini-c"]
+
+    # Exhausted models are not asked again until their quota resets.
+    calls.clear()
+    provider.generate_json("s", "u", SCHEMA)
+    assert calls == ["gemini-c"]
+
+
+def test_all_models_cooling_down_fails_fast():
+    provider = make_provider(fallback_model="gemini-b")
+    calls = []
+
+    def busy(**kwargs):
+        calls.append(kwargs["model"])
+        raise errors.APIError(429, {"error": {"message": "retry in 1h", "status": "X"}})
+
+    _stub(provider, busy)
+
+    with pytest.raises(LLMUpstreamError):
+        provider.generate_json("s", "u", SCHEMA)
+
+    calls.clear()
+    with pytest.raises(LLMUpstreamError) as info:
+        provider.generate_json("s", "u", SCHEMA)
+
+    assert calls == []  # nothing sent while every model is cooling down
+    assert info.value.code == "LLM_RATE_LIMITED"
+
+
+@pytest.mark.parametrize(
+    "detail, status, expected",
+    [
+        ("Please retry in 16h49m49.5s.", 429, 16 * 3600 + 49 * 60 + 49.5),
+        ("'retryDelay': '56s'", 429, 56),
+        ("Please retry in 30.2s", 429, 30.2),
+        ("no hint", 429, 60),
+        ("no hint", 503, 20),
+    ],
+)
+def test_retry_after_seconds(detail, status, expected):
+    from backend.services.llm.gemini_provider import retry_after_seconds
+
+    assert retry_after_seconds(detail, status) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("status", [400, 401, 402, 500])
 def test_no_fallback_for_other_errors(status):
     provider = make_provider(fallback_model="gemini-fallback")
     calls = []

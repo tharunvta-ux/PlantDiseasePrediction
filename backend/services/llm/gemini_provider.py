@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import io
 import logging
+import re
+import threading
+import time
 import wave
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Callable, Dict, List, Sequence, TypeVar
 
 import httpx
 from google import genai
@@ -34,8 +37,22 @@ RETRY_ATTEMPTS = 2
 
 MAX_OUTPUT_TOKENS = 2048
 
-# Overloaded / rate-limited: worth trying the fallback model.
-FALLBACK_STATUSES = frozenset({429, 503})
+# Overloaded / rate-limited / retired (404): try the next model in the chain.
+FALLBACK_STATUSES = frozenset({404, 429, 503})
+
+# The SDK retries these on the same model. 429/503 are left out: moving
+# to the next free model is faster than waiting on an exhausted one.
+SDK_RETRY_STATUSES = [408, 500, 502, 504]
+
+# How long a model is skipped after 429 / 503 when the error does not
+# say when to retry. Free-tier daily quotas say so ("retry in 16h49m").
+DEFAULT_COOLDOWN_SECONDS = {404: 24 * 3600.0, 429: 60.0, 503: 20.0}
+MAX_COOLDOWN_SECONDS = 24 * 3600.0
+
+_RETRY_IN = re.compile(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?", re.IGNORECASE)
+_RETRY_DELAY = re.compile(r"retryDelay['\"]?\s*:\s*['\"](\d+(?:\.\d+)?)s", re.IGNORECASE)
+
+T = TypeVar("T")
 
 # Prebuilt Gemini TTS voice (multilingual).
 TTS_VOICE = "Kore"
@@ -68,6 +85,42 @@ def as_wav(data: bytes, sample_rate: int = TTS_SAMPLE_RATE) -> bytes:
     return buffer.getvalue()
 
 
+def model_chain(primary: str | None, fallbacks: str | Sequence[str] | None) -> List[str]:
+    """
+    Primary model followed by the fallbacks, without duplicates.
+    `fallbacks` may be a comma-separated string.
+    """
+
+    if isinstance(fallbacks, str):
+        fallbacks = fallbacks.split(",")
+
+    chain: List[str] = []
+
+    for name in [primary, *(fallbacks or [])]:
+        name = (name or "").strip()
+        if name and name not in chain:
+            chain.append(name)
+
+    return chain
+
+
+def retry_after_seconds(detail: str, status: int | None) -> float:
+    """Cooldown for a rate-limited / overloaded model, from the error text."""
+
+    match = _RETRY_DELAY.search(detail)
+    if match:
+        seconds = float(match.group(1))
+    else:
+        match = _RETRY_IN.search(detail)
+        if match and any(match.groups()):
+            hours, minutes, secs = match.groups()
+            seconds = int(hours or 0) * 3600 + int(minutes or 0) * 60 + float(secs or 0)
+        else:
+            seconds = DEFAULT_COOLDOWN_SECONDS.get(status or 0, 30.0)
+
+    return min(max(seconds, 1.0), MAX_COOLDOWN_SECONDS)
+
+
 class GeminiProvider:
     """Calls the Gemini API with structured JSON output."""
 
@@ -80,38 +133,43 @@ class GeminiProvider:
         timeout_seconds: float,
         temperature: float,
         base_url: str | None = None,
-        fallback_model: str | None = None,
+        fallback_model: str | Sequence[str] | None = None,
         tts_model: str | None = None,
-        tts_fallback_model: str | None = None,
+        tts_fallback_model: str | Sequence[str] | None = None,
         tts_timeout_seconds: float = 60.0,
     ) -> None:
         """
         Args:
             base_url: Optional API endpoint override (proxies, tests).
-            fallback_model: Model tried once when the primary model is
-                overloaded or rate-limited (HTTP 503 / 429).
-            tts_model / tts_fallback_model: Text-to-speech models.
+            fallback_model: Models tried in order when the previous one is
+                overloaded or rate-limited (HTTP 503 / 429). A list or a
+                comma-separated string. Free-tier quotas are per model, so
+                each free model adds its own daily allowance.
+            tts_model / tts_fallback_model: Text-to-speech models (same).
         """
 
         if not api_key:
             raise LLMNotConfiguredError("Gemini API key is missing.")
 
         self.model = model
-        self.fallback_model = (
-            fallback_model if fallback_model and fallback_model != model else None
-        )
+        self.models = model_chain(model, fallback_model)
         self.tts_model = tts_model
-        self.tts_fallback_model = (
-            tts_fallback_model if tts_fallback_model and tts_fallback_model != tts_model else None
-        )
+        self.tts_models = model_chain(tts_model, tts_fallback_model) if tts_model else []
         self.temperature = temperature
+
+        # model -> time.monotonic() until which it is skipped
+        self._cooldown_until: Dict[str, float] = {}
+        self._cooldown_lock = threading.Lock()
 
         self._client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(
                 base_url=base_url,
                 timeout=int(timeout_seconds * 1000),
-                retry_options=types.HttpRetryOptions(attempts=RETRY_ATTEMPTS),
+                retry_options=types.HttpRetryOptions(
+                    attempts=RETRY_ATTEMPTS,
+                    http_status_codes=SDK_RETRY_STATUSES,
+                ),
             ),
         )
 
@@ -134,9 +192,8 @@ class GeminiProvider:
         image: ImageInput | None = None,
     ) -> LLMResponse:
         """
-        Generate JSON text (optionally about an image), falling back to
-        `fallback_model` once if the primary model is overloaded or
-        rate-limited.
+        Generate JSON text (optionally about an image), moving down the
+        model chain while models are overloaded or rate-limited.
         """
 
         contents: Any = user_prompt
@@ -159,25 +216,64 @@ class GeminiProvider:
             ),
         )
 
-        try:
-            return self._generate(self.model, contents, config)
+        return self._first_available(
+            self.models,
+            lambda model: self._generate(model, contents, config),
+            "Model",
+        )
 
-        except LLMUpstreamError as exc:
-            if not self.fallback_model or exc.status not in FALLBACK_STATUSES:
-                raise
+    def _first_available(self, models: List[str], call: Callable[[str], T], label: str) -> T:
+        """
+        Run `call` on the first model in `models` that is not cooling down;
+        on 404 / 429 / 503 cool that model down and try the next one.
+        """
 
-            logger.warning(
-                "Model %s unavailable (%s); falling back to %s",
-                self.model,
-                exc.status,
-                self.fallback_model,
+        now = time.monotonic()
+
+        with self._cooldown_lock:
+            ready = [m for m in models if self._cooldown_until.get(m, 0.0) <= now]
+
+        if not ready:
+            raise LLMUpstreamError(
+                "Every configured model is rate-limited or overloaded.",
+                code="LLM_RATE_LIMITED",
+                public_message=(
+                    "The AI service has reached its free usage limit or is busy. "
+                    "Please try again later."
+                ),
+                status=429,
             )
 
-            return self._generate(self.fallback_model, contents, config)
+        for index, model in enumerate(ready):
+            try:
+                return call(model)
+
+            except LLMUpstreamError as exc:
+                if exc.status not in FALLBACK_STATUSES:
+                    raise
+
+                cooldown = retry_after_seconds(exc.detail, exc.status)
+
+                with self._cooldown_lock:
+                    self._cooldown_until[model] = time.monotonic() + cooldown
+
+                if index == len(ready) - 1:
+                    raise
+
+                logger.warning(
+                    "%s %s unavailable (%s), skipped for %.0f s; falling back to %s",
+                    label,
+                    model,
+                    exc.status,
+                    cooldown,
+                    ready[index + 1],
+                )
+
+        raise AssertionError("unreachable")
 
     def synthesize_speech(self, text: str, language_tag: str) -> SpeechAudio:
         """
-        Text-to-speech with the TTS model (falls back once on 503/429).
+        Text-to-speech, moving down the TTS model chain on 503/429.
 
         Returns:
             WAV audio (24 kHz mono 16-bit).
@@ -197,21 +293,11 @@ class GeminiProvider:
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
 
-        try:
-            return self._speech(self.tts_model, text, config)
-
-        except LLMUpstreamError as exc:
-            if not self.tts_fallback_model or exc.status not in FALLBACK_STATUSES:
-                raise
-
-            logger.warning(
-                "TTS model %s unavailable (%s); falling back to %s",
-                self.tts_model,
-                exc.status,
-                self.tts_fallback_model,
-            )
-
-            return self._speech(self.tts_fallback_model, text, config)
+        return self._first_available(
+            self.tts_models,
+            lambda model: self._speech(model, text, config),
+            "TTS model",
+        )
 
     def _speech(
         self,
