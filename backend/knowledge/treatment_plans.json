@@ -5,6 +5,7 @@
     "checked_on": "2026-10-27",
     "expert_reviewed": false,
     "review_note": "Products and doses were copied from the TNAU pages linked per disease. Care steps without a TNAU page are general, low-risk cultural practices. An agronomist must review this file before production use, and product registration status must be re-checked periodically.",
+    "cibrc_note": "Where TNAU has no page for a disease, an entry may instead use an exact crop + disease match from the Government of India CIB&RC list 'Major uses of pesticides - Fungicides' (registered under the Insecticides Act 1968, up to 31/03/2024, https://ppqs.gov.in/sites/default/files/fungicides_31.03.2024.pdf), marked \"source_name\": \"CIB&RC\". Checked 2026-11-10: only Apple black rot (Zineb 75% WP) had an exact match among the model's diseases without a TNAU product; bacterial spot options in that list are antibiotic mixtures (kasugamycin) and are not used.",
     "excluded_from_tnau": [
       {
         "chemical": "Captafol",
@@ -44,14 +45,17 @@
       "wait_days": 10
     },
     "Apple___Black_rot": {
-      "source_url": null,
+      "source_url": "https://ppqs.gov.in/sites/default/files/fungicides_31.03.2024.pdf",
+      "source_name": "CIB&RC",
       "care": [
         "Prune out dead branches and cankers and remove mummified fruit from the tree and the ground.",
         "Destroy the removed material away from the orchard.",
         "Remove fallen infected leaves."
       ],
-      "products": [],
-      "wait_days": 7
+      "products": [
+        {"name": "Zineb 75% WP", "dose": "1.5-2 kg per hectare in 750-1000 litres of water", "kind": "fungicide", "group": "FRAC M03"}
+      ],
+      "wait_days": 10
     },
     "Apple___Cedar_apple_rust": {
       "source_url": null,

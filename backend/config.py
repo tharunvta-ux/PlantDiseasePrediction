@@ -73,6 +73,13 @@ DEFAULT_TTS_MODEL = "gemini-3.8-flash-lite-tts"
 DEFAULT_TTS_FALLBACK_MODEL = "gemini-3.8-flash-tts,gemini-3.1-flash-tts-preview"
 
 
+# -----------------------------------------------------
+# PayPal (treatment-kit checkout)
+# -----------------------------------------------------
+
+DEFAULT_PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
+
+
 def _env_float(name: str, default: float) -> float:
     """Read a float environment variable, falling back on bad input."""
 
@@ -104,6 +111,16 @@ class Settings:
     database_url: str
     secret_key: str | None
     session_cookie_secure: bool
+    paypal_client_id: str | None = None
+    paypal_client_secret: str | None = None
+    paypal_api_base: str = "https://api-m.sandbox.paypal.com"
+    paypal_timeout_seconds: float = 20.0
+
+    @property
+    def paypal_configured(self) -> bool:
+        """True when PayPal sandbox credentials are available."""
+
+        return bool(self.paypal_client_id and self.paypal_client_secret)
 
     @property
     def model_artifacts_dir(self) -> Path:
@@ -172,4 +189,11 @@ def get_settings() -> Settings:
         secret_key=os.getenv("SECRET_KEY", "").strip() or None,
         session_cookie_secure=os.getenv("SESSION_COOKIE_SECURE", "").strip().lower()
         in ("1", "true", "yes"),
+        paypal_client_id=os.getenv("PAYPAL_CLIENT_ID", "").strip() or None,
+        paypal_client_secret=os.getenv("PAYPAL_CLIENT_SECRET", "").strip() or None,
+        # Sandbox by default: this app is a demo and never takes real money.
+        paypal_api_base=(
+            os.getenv("PAYPAL_API_BASE", "").strip().rstrip("/") or DEFAULT_PAYPAL_API_BASE
+        ),
+        paypal_timeout_seconds=_env_float("PAYPAL_TIMEOUT_SECONDS", 20.0),
     )

@@ -128,6 +128,53 @@ crop for 15 of 20 test images (e.g. tomato leaves called potato).
   builds the spoken text from its own data, so the key cannot be used
   as a free TTS service.
 
+## Treatment kit checkout (PayPal sandbox + AI assistant)
+
+Knowing *what* to spray is only half the problem: the grower also has to
+work out *how much* to buy for their field and get it. Every treatment
+step that lists a TNAU product now has a **🛒 Get this treatment
+delivered** panel in the treatment history:
+
+1. **Size the kit.** Type the field size (acres, cents, hectares or square
+   metres) and the number of sprays, or tell the **AI assistant** in your
+   own words and language ("arai acre thakkali, rendu thadava", "I have 20
+   cents of chilli and already have mancozeb"). Gemini reads the area,
+   unit and sprays, picks one of the step's listed options (skipping one
+   the grower already has) and explains its choice in their language.
+2. **Kit maths** (`backend/services/kit_service.py`, deterministic): the
+   TNAU dose text is parsed ("0.25% (2.5 g per litre)", "200 ml per
+   acre", "50 g per 100 litres") and multiplied by the spray volume
+   (500 litres per hectare) or the area, times the sprays. The cheapest
+   combination of catalog packs that covers it is chosen
+   (`backend/knowledge/shop_catalog.json`, demo prices).
+3. **Pay with PayPal** (`backend/services/paypal_service.py`, Orders v2):
+   the server creates the order with itemised packs, reference
+   `case-<id>-step-<n>` and a unique invoice id; the grower approves it
+   in the PayPal window; the server captures it and checks the captured
+   amount matches before marking the order paid. The shipping address
+   comes from the buyer's PayPal account.
+4. **Next step, new kit.** If the step did not work, the plan moves to a
+   product from a different chemical group and the panel re-prices a kit
+   for the same field automatically (remembered from the last order).
+5. **Cancel and refund** a paid kit (Payments v2 full refund).
+
+Guardrails: the browser never sends prices (the server recomputes the
+kit from the curated plan when the order is created); the assistant can
+only choose between the step's listed products by number and may not
+write doses or product names; uncertain diagnoses get care steps only,
+so nothing can be bought until a diagnosis is confident.
+
+Routes: `GET /shop/config`, `POST /shop/cases/<id>/kit`,
+`POST /shop/cases/<id>/assistant`, `POST /shop/cases/<id>/orders`,
+`POST /shop/orders/<paypal_order_id>/capture`, `GET /shop/orders`,
+`POST /shop/orders/<id>/refund`.
+
+Setup: create a sandbox app at
+[developer.paypal.com](https://developer.paypal.com/dashboard/applications/sandbox)
+and set `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` (see `.env.example`).
+Pay with a sandbox **personal** account from the same dashboard. This is
+a demo store: no real money is taken and nothing is shipped.
+
 Data is stored with SQLAlchemy: SQLite at `instance/verdant.db` locally,
 Postgres in production via `DATABASE_URL`.
 

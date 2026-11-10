@@ -55,6 +55,12 @@ PRODUCT_SAFETY = (
     "by TNAU - check that the product is registered for your crop locally."
 )
 
+CIBRC_PRODUCT_SAFETY = (
+    "Use only the listed product. Read and follow the product label (dose, "
+    "safety gear, waiting period before harvest). The dose is the registered "
+    "use in the CIB&RC list (Government of India)."
+)
+
 EXPERT_ACTIONS = [
     "Take the plant (or clear photos of affected leaves) to your nearest "
     "Krishi Vigyan Kendra (KVK) or agriculture / horticulture department office.",
@@ -191,6 +197,13 @@ def _treatment_step(
             "You confirmed the symptoms match, so TNAU's treatment is suggested. "
             "If unsure, show the plant to an expert before spraying."
         )
+    elif entry.get("source_name") == "CIB&RC":
+        title = f"Care steps plus a {kind_word} registered in India for this disease"
+        reason = (
+            "The diagnosis is confident, so a targeted treatment is suggested. TNAU "
+            "has no page for this disease; the product and dose are from the "
+            "Government of India's list of registered pesticide uses (CIB&RC)."
+        )
     else:
         title = f"Care steps plus a TNAU-recommended {kind_word}"
         reason = "The diagnosis is confident, so a targeted treatment is suggested."
@@ -198,7 +211,10 @@ def _treatment_step(
     return StepPlan(
         kind=KIND_TREATMENT,
         title=title,
-        actions=[*entry.get("care", []), PRODUCT_SAFETY],
+        actions=[
+            *entry.get("care", []),
+            CIBRC_PRODUCT_SAFETY if entry.get("source_name") == "CIB&RC" else PRODUCT_SAFETY,
+        ],
         products=[{k: p[k] for k in ("name", "dose", "kind", "group")} for p in products],
         wait_days=int(entry.get("wait_days") or 7),
         check_question=_check_question(viral),

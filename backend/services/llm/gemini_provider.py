@@ -37,16 +37,18 @@ RETRY_ATTEMPTS = 2
 
 MAX_OUTPUT_TOKENS = 2048
 
-# Overloaded / rate-limited / retired (404): try the next model in the chain.
-FALLBACK_STATUSES = frozenset({404, 429, 503})
+# Overloaded / rate-limited / retired (404) / gateway timeout (504, the
+# server-side "deadline expired" seen when a model is overloaded): try
+# the next model in the chain.
+FALLBACK_STATUSES = frozenset({404, 429, 503, 504})
 
-# The SDK retries these on the same model. 429/503 are left out: moving
-# to the next free model is faster than waiting on an exhausted one.
-SDK_RETRY_STATUSES = [408, 500, 502, 504]
+# The SDK retries these on the same model. 429/503/504 are left out:
+# moving to the next free model is faster than waiting on a busy one.
+SDK_RETRY_STATUSES = [408, 500, 502]
 
-# How long a model is skipped after 429 / 503 when the error does not
-# say when to retry. Free-tier daily quotas say so ("retry in 16h49m").
-DEFAULT_COOLDOWN_SECONDS = {404: 24 * 3600.0, 429: 60.0, 503: 20.0}
+# How long a model is skipped after 429 / 503 / 504 when the error does
+# not say when to retry. Free-tier daily quotas say so ("retry in 16h49m").
+DEFAULT_COOLDOWN_SECONDS = {404: 24 * 3600.0, 429: 60.0, 503: 20.0, 504: 20.0}
 MAX_COOLDOWN_SECONDS = 24 * 3600.0
 
 _RETRY_IN = re.compile(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?", re.IGNORECASE)

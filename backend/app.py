@@ -22,12 +22,13 @@ from backend.routes.frontend_routes import frontend_bp
 from backend.routes.model_routes import model_bp
 from backend.routes.prediction_routes import prediction_bp
 from backend.routes.recommendation_routes import recommendation_bp
+from backend.routes.shop_routes import shop_bp
 from backend.routes.tracking_routes import tracking_bp
 
 logger = logging.getLogger(__name__)
 
 # State-changing requests to these paths must come from this site.
-SAME_ORIGIN_PREFIXES = ("/auth/", "/cases")
+SAME_ORIGIN_PREFIXES = ("/auth/", "/cases", "/shop/")
 
 
 def create_app() -> Flask:
@@ -90,6 +91,7 @@ def create_app() -> Flask:
     app.register_blueprint(model_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(tracking_bp)
+    app.register_blueprint(shop_bp)
     app.register_blueprint(frontend_bp)
 
     @app.errorhandler(413)

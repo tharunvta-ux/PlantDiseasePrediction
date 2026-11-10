@@ -287,11 +287,14 @@
 
   function productCard(step) {
     if (!step.products || !step.products.length) return null;
+    const cibrc = (step.source_url || "").startsWith("https://ppqs.gov.in/");
 
     return el("div", { class: "product-card" }, [
       el("p", {
         class: "product-title",
-        text: T(step.products.length > 1 ? "Use ONE of these TNAU-recommended options:" : "TNAU-recommended option:"),
+        text: cibrc
+          ? T("Registered option (CIB&RC, Government of India):")
+          : T(step.products.length > 1 ? "Use ONE of these TNAU-recommended options:" : "TNAU-recommended option:"),
       }),
       el("table", { class: "product-table" }, [
         el("tbody", {}, step.products.map((p) =>
@@ -305,7 +308,7 @@
       step.source_url
         ? el("p", { class: "treatment-meta" }, [
             `${T("Source:")} `,
-            el("a", { href: step.source_url, target: "_blank", rel: "noopener", text: "TNAU Agritech Portal" }),
+            el("a", { href: step.source_url, target: "_blank", rel: "noopener", text: cibrc ? "CIB&RC: Major uses of pesticides (fungicides)" : "TNAU Agritech Portal" }),
           ])
         : null,
     ]);
@@ -607,6 +610,9 @@
     const meta = data.meta || {};
     trackNote.textContent =
       T("Tracking saves this plan to your history and shows when to check whether it worked.") +
+      (data.step.products.length
+        ? ` ${T("🛒 After tracking, you can order this treatment, sized for your field, and pay with PayPal.")}`
+        : "") +
       (data.step.products.length && meta.checked_on
         ? ` ${T("Product options copied from TNAU (checked {date}); not yet reviewed by an agronomist.", { date: meta.checked_on })}`
         : "");
@@ -830,6 +836,18 @@
     return button;
   }
 
+  // Why there is nothing to buy for this step (no chemical is sold
+  // without a confident diagnosis).
+  function noKitNote(c, step) {
+    if (step.kind === "care" && c.confidence_level === "uncertain") {
+      return el("p", { class: "kit-note", text: T("🛒 No treatment to order yet: the diagnosis is uncertain, so only low-risk care steps are suggested. Add a clear, close photo of one affected leaf at the next check; a confident diagnosis unlocks the TNAU treatment and the order option.") });
+    }
+    if (step.kind === "expert") {
+      return el("p", { class: "kit-note", text: T("🛒 Nothing to order for this step: an expert should look at the plant first.") });
+    }
+    return null;
+  }
+
   function caseCard(c) {
     const [statusText, statusClass] = STATUS[c.status] || STATUS.active;
     const step = c.current_step;
@@ -870,15 +888,30 @@
         ? el("div", { class: "current-step" }, [
             el("p", { class: "result-eyebrow", text: T("Current step {n}", { n: step.number }) }),
             stepBody(step, true),
+            window.VerdantShop && step.products && step.products.length
+              ? window.VerdantShop.kitPanel(c, step, shopHelpers)
+              : noKitNote(c, step),
             checkInForm(c, step),
           ])
         : null,
+      window.VerdantShop ? window.VerdantShop.ordersBlock(c, shopHelpers) : null,
       timeline(c),
       el("div", { class: "case-footer" }, [
         el("button", { type: "button", class: "link-button danger", text: T("Delete record"), onclick: () => deleteCase(c) }),
       ]),
     ]);
   }
+
+  // What shop.js (treatment-kit checkout) needs from this file.
+  const shopHelpers = {
+    el,
+    api,
+    postJson,
+    T,
+    language,
+    formatDate,
+    refresh: () => renderHistory(),
+  };
 
   function renderHistory() {
     historySignedOut.classList.toggle("hidden", Boolean(user));
@@ -1015,6 +1048,7 @@
         password: authPassword.value,
       });
       user = data.user;
+      if (window.VerdantShop) window.VerdantShop.reset();
       authPassword.value = "";
       authDialog.close();
       renderAccount();
@@ -1039,6 +1073,7 @@
     }
     user = null;
     cases = [];
+    if (window.VerdantShop) window.VerdantShop.reset();
     renderAccount();
     renderHistory();
   }

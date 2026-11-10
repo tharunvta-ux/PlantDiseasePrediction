@@ -845,6 +845,81 @@ img { max-width: 100%; display: block; }
 
 .photo-tip { font-size: 0.75rem; color: var(--muted-foreground); }
 
+/* ---------- Treatment kit (PayPal checkout) ---------- */
+
+.kit-panel {
+  margin-top: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid oklch(0.58 0.16 150 / 0.3);
+  background: oklch(0.58 0.16 150 / 0.05);
+  padding: 1rem;
+}
+.kit-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.kit-title { font-size: 1rem; font-weight: 700; }
+.kit-panel > .treatment-meta { margin-top: 0.375rem; }
+.kit-assistant { margin-top: 0.5rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+.kit-assistant .field { width: 100%; }
+.kit-assistant .btn-primary { padding: 0.5rem 1.25rem; font-size: 0.875rem; }
+.assistant-reply {
+  margin-top: 0.75rem;
+  border-radius: 0.875rem;
+  border-left: 3px solid var(--primary);
+  background: oklch(1 0 0 / 0.7);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.assistant-reply::before { content: "✨ "; }
+.kit-form { margin-top: 0.25rem; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 0.75rem; }
+.kit-form .field { flex: 0 1 auto; }
+.kit-form .kit-area { flex: 1 1 14rem; }
+.kit-form .kit-product { flex: 1 1 12rem; }
+.kit-area-row { display: flex; gap: 0.375rem; }
+.kit-area-row input { width: 100%; min-width: 0; flex: 1 1 5rem; }
+.kit-form select {
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: oklch(1 0 0 / 0.85);
+  padding: 0.625rem 0.5rem;
+  max-width: 100%;
+}
+.kit-update { margin-top: 0.875rem; padding: 0.625rem 1.25rem; font-size: 0.875rem; }
+.kit-quote { margin-top: 1rem; border-radius: 0.875rem; background: oklch(1 0 0 / 0.75); border: 1px solid var(--border); padding: 0.875rem 1rem; }
+.kit-quote-title { font-size: 0.9375rem; }
+.kit-need { margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.5; }
+.kit-table td { border-top-color: var(--border); }
+.kit-total td { font-weight: 700; font-size: 0.9375rem; }
+.kit-quote .treatment-meta { margin-top: 0.5rem; }
+.paypal-buttons { margin-top: 1rem; max-width: 26rem; min-height: 2.75rem; }
+.kit-disclaimer { margin-top: 0.75rem; font-size: 0.75rem; }
+.kit-panel .explain-error, .kit-panel .case-feedback { margin-top: 0.75rem; }
+
+.kit-note {
+  margin-top: 1rem;
+  border-radius: 0.875rem;
+  border: 1px dashed var(--border);
+  background: oklch(1 0 0 / 0.55);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.kit-paid-items { margin-top: 0.5rem; padding-left: 1.1rem; list-style: disc; font-size: 0.875rem; display: flex; flex-direction: column; gap: 0.25rem; }
+
+.kit-orders:empty { display: none; }
+.kit-orders { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.875rem; }
+.kit-order-list { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.kit-order { border-radius: 0.875rem; border: 1px solid var(--border); background: oklch(1 0 0 / 0.6); padding: 0.625rem 0.875rem; font-size: 0.875rem; }
+.kit-order-paid { border-color: oklch(0.58 0.16 150 / 0.35); }
+.kit-order-refunded { opacity: 0.75; }
+.kit-order-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.75rem; }
+.kit-order .timeline-text, .kit-order .treatment-meta { margin-top: 0.25rem; }
+.kit-order .link-button { margin-top: 0.375rem; font-size: 0.8125rem; }
+
 .expert-links { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .expert-links .btn-primary, .expert-links .btn-outline { padding: 0.5rem 1rem; font-size: 0.8125rem; }
 

@@ -124,6 +124,71 @@ class TreatmentStep(Base):
     case: Mapped[TreatmentCase] = relationship(back_populates="steps")
 
 
+ORDER_CREATED = "created"  # PayPal order created, waiting for the buyer
+ORDER_PAID = "paid"
+ORDER_REFUNDED = "refunded"
+ORDER_FAILED = "failed"
+
+
+class ShopOrder(Base):
+    """A treatment kit paid with PayPal (sandbox), linked to a case step."""
+
+    __tablename__ = "shop_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # Kept when the case is deleted (it is still a payment record).
+    case_id: Mapped[int | None] = mapped_column(
+        ForeignKey("treatment_cases.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    step_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    paypal_order_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    invoice_id: Mapped[str] = mapped_column(String(64), unique=True)
+    status: Mapped[str] = mapped_column(String(20), default=ORDER_CREATED)
+    currency: Mapped[str] = mapped_column(String(3))
+    total: Mapped[str] = mapped_column(String(20))
+    product: Mapped[str] = mapped_column(String(200))
+    display_name: Mapped[str] = mapped_column(String(200))
+    items: Mapped[list] = mapped_column(JSON, default=list)
+    # Area, unit and sprays the kit was sized for (reused for the next step).
+    field: Mapped[dict] = mapped_column(JSON, default=dict)
+    quote: Mapped[dict] = mapped_column(JSON, default=dict)
+    assistant: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    capture_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payer: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    shipping: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    refund_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "case_id": self.case_id,
+            "step_number": self.step_number,
+            "paypal_order_id": self.paypal_order_id,
+            "invoice_id": self.invoice_id,
+            "status": self.status,
+            "currency": self.currency,
+            "total": self.total,
+            "product": self.product,
+            "display_name": self.display_name,
+            "items": self.items or [],
+            "field": self.field or {},
+            "field_text": (self.quote or {}).get("field_text"),
+            "needed_text": (self.quote or {}).get("needed_text"),
+            "payer": self.payer,
+            "shipping": self.shipping,
+            "created_at": iso(self.created_at),
+            "paid_at": iso(self.paid_at),
+            "refunded_at": iso(self.refunded_at),
+        }
+
+
 class Translation(Base):
     """Cached machine translation of one app-generated text."""
 

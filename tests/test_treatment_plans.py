@@ -49,9 +49,13 @@ def test_plan_entries_are_well_formed(name):
         assert all(product.values())
 
     if entry["products"]:
-        assert entry["source_url"].startswith("https://agritech.tnau.ac.in/"), (
-            "chemical options must come from a TNAU page"
-        )
+        # TNAU crop-protection pages, or (where TNAU has no page for the
+        # disease) the Government of India's CIB&RC list of registered uses.
+        assert entry["source_url"].startswith(
+            ("https://agritech.tnau.ac.in/", "https://ppqs.gov.in/")
+        ), "chemical options must come from TNAU or the CIB&RC registered-use list"
+        if entry["source_url"].startswith("https://ppqs.gov.in/"):
+            assert entry.get("source_name") == "CIB&RC"
 
 
 def test_banned_or_excluded_chemicals_are_never_suggested():
