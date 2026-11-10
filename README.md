@@ -1,204 +1,237 @@
-# Plant Disease Detection and Treatment Recommendation System
+# Verdant: AI Crop Doctor + PayPal Treatment Kits
 
-## Project Overview
+**Snap a leaf. Verdant's AI diagnoses the crop disease, gives a safe
+step-by-step treatment plan in the farmer's own language, works out the
+exact spray kit for their field, and lets them buy it with PayPal.**
 
-This project is a Deep Learning based web application that detects plant diseases from leaf images.
+| | |
+|---|---|
+| 🌐 **Live demo** | [plant-disease-detection-p7f3.onrender.com/app](https://plant-disease-detection-p7f3.onrender.com/app/) (the free server sleeps when idle; the first load can take about a minute) |
+| 🎬 **Video (under 3 min)** | _link added on submission_ |
+| 🧪 **PayPal sandbox buyer** | email `sb-cziqj53836512@personal.example.com` · password `a__kS0hT` (fake sandbox account, no real money) |
+| 📄 **License** | [MIT](LICENSE) |
 
-## Technology Stack
+Built for the **PayPal AI Hackathon** (Devpost, Oct 1 – Nov 12, 2026).
 
-- Python
-- Flask
-- TensorFlow
-- Keras
-- OpenCV
-- NumPy
-- SQLite
-- HTML
-- CSS
-- JavaScript
+---
 
-## Project Structure
+## The problem
 
+A smallholder farmer sees spots on a leaf. Three questions decide
+whether the crop is saved:
+
+1. **What is it?** Most farmers have no plant doctor nearby.
+2. **What should I spray, and is it safe?** Shop advice is often wrong,
+   and banned or fake chemicals are a real problem.
+3. **How much do I buy?** Doses are written as "0.25%" or "200 ml per
+   acre". Turning that into packs for *my* half acre and two sprays is
+   hard, so farmers buy too little (the treatment fails) or too much
+   (money wasted, extra chemicals in the field).
+
+Verdant answers all three, and then lets the farmer buy the right kit.
+
+## What it does
+
+1. **Photo → diagnosis.** Take a photo of a leaf (the phone camera opens
+   directly). Gemini identifies the plant; a CNN trained on 38 classes
+   (14 crops) diagnoses the disease, with calibrated confidence and a
+   heat map showing where it looked.
+2. **A safe, step-by-step plan.** Products and doses come **only** from
+   curated official sources (TNAU Agritech Portal; Government of India
+   CIB&RC registered uses), never from the AI. An uncertain diagnosis
+   gets low-risk care steps only; banned chemicals and antibiotics are
+   never suggested.
+3. **In the farmer's language.** Every screen, plan and history entry is
+   available in 12 languages (English, Hindi, Tamil, Telugu, Kannada,
+   Malayalam, Marathi, Bengali, Gujarati, Punjabi, Spanish, French), with
+   🔊 read-aloud for farmers who prefer listening.
+4. **🛒 The treatment kit + PayPal.** The farmer tells the **AI assistant**
+   about their field in their own words, for example *"எனக்கு அரை ஏக்கர்
+   தக்காளி, ரெண்டு தடவை தெளிக்கணும்"* (Tamil for "half an acre of
+   tomato, spraying twice"). The assistant works out 0.5 acre and 2
+   sprays and chooses among the listed products. Verdant computes the
+   exact quantity and the cheapest combination of packs, and the farmer
+   pays with **PayPal**.
+5. **Tracking that closes the loop.** Each step has a "check again on"
+   date. If the farmer answers *"It did not work"*, the plan moves to a
+   product from a **different chemical group** (resistance management),
+   and the kit for the next step is **priced automatically for the same
+   field**: one tap to re-order. Paid kits can be cancelled and refunded.
+
+## How PayPal is used
+
+All server-side, with the [PayPal REST APIs](https://developer.paypal.com/api/rest/) in the sandbox
+(`backend/services/paypal_service.py`, `backend/routes/shop_routes.py`):
+
+| PayPal feature | Use in Verdant |
+|---|---|
+| **OAuth 2.0 client credentials** | Server access token, cached and renewed automatically |
+| **Orders v2: create** (`intent: CAPTURE`) | Itemised order: one line per pack (SKU, quantity, unit price), `item_total` breakdown, `reference_id` = case + treatment step, unique `invoice_id`, `brand_name`, shipping from the buyer's PayPal account |
+| **PayPal JS SDK buttons** | PayPal and card buttons; the buyer approves in the PayPal window |
+| **Orders v2: capture** | After approval. The server checks the captured **amount and currency match** its own quote before marking the order paid, and stores the payer and shipping address |
+| **Payments v2: refund** | "Cancel order and refund" for a paid kit |
+| **`PayPal-Request-Id`** | Idempotent create, capture and refund, so a retried request is never applied twice |
+| **Error handling** | `INSTRUMENT_DECLINED` restarts the PayPal flow so the buyer can choose another funding source; `ORDER_ALREADY_CAPTURED` is treated as success |
+
+**The browser never sends prices.** When the order is created, the
+server recomputes the kit from the case's current treatment step and the
+catalog, so a manipulated request cannot change what is charged or add
+products the plan does not list.
+
+## How AI is used
+
+| AI tool | What it does |
+|---|---|
+| **Custom CNN** (TensorFlow/Keras, served as an 8-bit TFLite model) | Disease diagnosis for 38 PlantVillage classes. 93% accuracy on held-out PlantVillage validation images (lab photos; real-field accuracy is lower and not yet measured). Temperature-calibrated confidence levels; occlusion heat maps |
+| **Google Gemini** (`gemini-3.8-flash`, with a fallback chain of free models) | Plant identification from the photo (vision); plain-language explanation of the diagnosis grounded in the plan; replies to check-in notes; translation of plans and screens into 12 languages; text-to-speech for Indian languages |
+| **Gemini as a shopping assistant** (`backend/services/shop_assistant_service.py`) | Reads the farmer's field description in any of the 12 languages and returns structured JSON (area, unit, sprays, chosen option, a product the farmer already has). It may only choose between the step's **listed** products, by number; it never writes doses or prices (a reply that contains one is replaced) |
+| **OpenCV** | Severity: share of the leaf that is spotted or discoloured, combined with the farmer's estimate |
+
+**Agentic commerce with guardrails.** The AI *proposes* (field size,
+which listed product); deterministic code *decides* (quantity from the
+official dose, cheapest packs, price); the farmer *approves* every
+payment in PayPal. The agent cannot invent a product, change a dose or
+pay on its own.
+
+## Try it (judges)
+
+**Hosted demo:** open https://plant-disease-detection-p7f3.onrender.com/app/
+
+1. **Sign in → Create one** (any email and an 8+ character password).
+2. Upload a clear leaf photo. Good test images: any photo from the
+   public [PlantVillage dataset](https://github.com/spMohanty/PlantVillage-Dataset/tree/master/raw/color),
+   for example from the `Corn_(maize)___Common_rust_` folder. Then click
+   **Predict disease**.
+3. Under **What to do now**, click **Track this treatment**.
+4. Go to **History**. In **🛒 Get this treatment delivered**, type
+   *"half an acre, 2 sprays"* (in any language) and click **Ask the
+   assistant**, or enter the area and click **Calculate kit**.
+5. Click **PayPal** and log in with the sandbox buyer above. You'll see
+   **✓ Paid** and the order with its shipping address.
+6. Optional: in the check-in form choose **It did not work → Save check**.
+   Step 2's kit (a different chemical group) is priced for the same
+   field automatically. Try **🌐** to switch language, and
+   **Cancel order and refund**.
+
+> If the diagnosis is *uncertain*, Verdant deliberately offers only
+> low-risk care steps and nothing to buy. Use a clearer photo.
+
+## Run it locally
+
+Requirements: Python 3.12, a free [Gemini API key](https://aistudio.google.com/apikey),
+and a free [PayPal sandbox app](https://developer.paypal.com/dashboard/applications/sandbox).
+
+```bash
+git clone https://github.com/tharunvta-ux/PlantDiseasePrediction.git
+cd PlantDiseasePrediction
+python -m venv venv
+venv\Scripts\activate            # macOS/Linux: source venv/bin/activate
+pip install -r requirements-render.txt
+cp .env.example .env              # Windows: copy .env.example .env
+```
+
+Fill in `.env`:
+
+```
+LLM_API_KEY=<your Gemini key>
+PAYPAL_CLIENT_ID=<sandbox app client id>
+PAYPAL_CLIENT_SECRET=<sandbox app secret>
+MODEL_PATH=saved_models/plant_disease_cnn_int8.tflite
+```
+
+```bash
+flask --app backend.app run --port 5000
+```
+
+Open **http://127.0.0.1:5000/app/**.
+
+**PayPal sandbox tip:** create the sandbox **business** (merchant) and
+**personal** (buyer) accounts with country **United States**, and link
+your sandbox app to that business account. Sandbox accounts created in
+India are blocked by PayPal's India regulations (see *Limitations*).
+
+**Tests:** `pip install pytest` then `pytest -m "not model and not live"`
+(350+ tests; PayPal and Gemini are mocked).
+
+### Deploy on Render (free)
+
+`render.yaml` is a Render Blueprint: **New → Blueprint**, pick this repo,
+then enter `LLM_API_KEY`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` and a
+free Postgres `DATABASE_URL` (e.g. [Neon](https://neon.tech); Render's own
+disk is wiped on every restart). The model runs as TFLite in about 150 MB of RAM.
+
+## Built during the hackathon (since Oct 1, 2026)
+
+The project started in July 2026 as a CNN disease classifier with a
+simple web page. During the submission period we added:
+
+- **PayPal treatment-kit checkout** (Orders v2 create and capture,
+  refunds, idempotency, server-side pricing) and the **AI shopping
+  assistant**
+- Dose parser and kit sizing for every product in the plans; pack
+  optimiser; automatic re-pricing for the next treatment step
+- Hybrid analysis: Gemini plant identification + CNN diagnosis
+- Treatment plans from TNAU / CIB&RC, treatment tracking with check-ins,
+  AI replies to check-in notes
+- Severity and recovery outlook; heat-map explanations; model
+  performance page; PDF report
+- 12 languages for every screen, with read-aloud
+- Gemini fallback chain for the free tier; Render deployment with a
+  TFLite model
+
+Full history: `git log --since=2026-10-01`.
+
+## Data sources and safety
+
+- **Products and doses:** [TNAU Agritech Portal: Crop Protection](https://agritech.tnau.ac.in/crop_protection/)
+  (checked 2026-10-27), and where TNAU has no page, the exact crop + disease
+  entry in the Government of India
+  [CIB&RC "Major uses of pesticides"](https://ppqs.gov.in/sites/default/files/fungicides_31.03.2024.pdf)
+  list. Each plan links to its source.
+- **Never suggested:** chemicals banned in India (captafol, tridemorph),
+  and antibiotic sprays (streptocycline etc.), because of antimicrobial
+  resistance. See `_meta` in `backend/knowledge/treatment_plans.json`.
+- Diseases with no official product for that crop get care steps and
+  then an expert (Kisan Call Centre, Krishi Vigyan Kendra), never an
+  invented product.
+- The plan files have **not yet been reviewed by an agronomist**.
+- **Regional knowledge packs:** plans (`treatment_plans.json`,
+  `ai_condition_plans.json`) and the shop catalog (`shop_catalog.json`)
+  are data files. India is the first pack; another country is added
+  with its own vetted pack, without code changes.
+
+## Limitations (honest)
+
+- **PayPal and India:** PayPal does not currently process domestic
+  payments within India. This demo runs entirely in the PayPal sandbox
+  with US test accounts. In production, the kit would be paid by family
+  abroad sending support home, or by farmers in countries where PayPal
+  handles local payments.
+- **Demo store:** prices are approximate demo prices in USD; nothing is
+  shipped.
+- **Model:** trained on PlantVillage lab photos; field photos with busy
+  backgrounds are harder, which is why the app shows confidence levels
+  and refuses to suggest chemicals when unsure.
+
+## Project structure
+
+```
 backend/
-frontend/
-dataset/
-saved_models/
-uploads/
+  app.py                      Flask app
+  routes/                     analysis, tracking, shop (PayPal), auth, model report
+  services/
+    kit_service.py            dose parsing, kit sizing, pack optimiser
+    paypal_service.py         PayPal REST client (Orders v2, refunds)
+    shop_assistant_service.py Gemini shopping assistant
+    treatment_plan_service.py curated plan ladder
+    llm/                      Gemini provider with fallback chain
+  knowledge/                  curated plans, disease info, shop catalog
+  prediction/                 CNN inference, calibration, severity, heat maps
+frontend/                     HTML, CSS, JS (app.js, tracking.js, shop.js)
+tests/                        pytest suite
+```
 
-## Current Status
-
-✅ Module 1 Completed
-
-## How an image is analysed (`POST /analyze`)
-
-1. **Plant identification** (Gemini vision): is it a plant, which plant,
-   is it one of the 14 crops the disease model supports?
-2. **Disease diagnosis** (trained CNN): only for supported crops, with
-   calibrated confidence levels. If the AI identifies a different crop
-   than the CNN, the CNN's best match *within* that crop is shown as
-   uncertain.
-3. **Other plants**: an AI observation of visible symptoms, clearly
-   marked as unverified.
-4. **Treatment guidance** (`POST /recommendation`): Gemini explains the
-   CNN's diagnosis using curated disease facts.
-
-If Gemini is unavailable, `/analyze` falls back to the CNN result alone.
-`POST /predict` returns the CNN result only (unchanged API).
-
-When the AI and the CNN name different crops, the CNN's result is kept
-but marked uncertain: on PlantVillage leaves Gemini named the correct
-crop for 15 of 20 test images (e.g. tomato leaves called potato).
-
-## Other features
-
-- **Where did the model look?** (`POST /explain`): occlusion-sensitivity
-  heat map. On sample images it shows the model partly relies on the
-  background and leaf edges, a known weakness of lab-photo training.
-- **Model performance page** (`/app/model`, data from `GET /model/report`):
-  held-out accuracy, confidence levels, per-class accuracy, confusion
-  matrix, calibration and training curves.
-- **Guidance in 12 languages** (`GET /languages`, `language` field on
-  `/analyze` and `/recommendation`) with a read-aloud button: English uses
-  the browser's voice; other languages use server-generated audio
-  (`POST /speech`, Gemini TTS) because most devices have no Tamil, Telugu,
-  etc. voice installed.
-- **PDF report**: the browser print dialog's "Save as PDF" produces a
-  one-page report with the photo, heat map, result and guidance.
-
-## Treatment plans and tracking
-
-- **Camera capture**: "Take photo" opens the back camera on phones.
-- **Step-by-step plan** (`POST /treatment-plan`): after a diagnosis the
-  app suggests a first step. Plans come from
-  `backend/knowledge/treatment_plans.json`, not from the LLM:
-  - uncertain diagnosis → low-risk care steps only;
-  - confident diagnosis → care steps plus a **TNAU-listed** fungicide /
-    insecticide with TNAU's dose (TNAU Agritech Portal, checked
-    2026-10-27, source link per disease);
-  - didn't work → a product from a *different* chemical group, then
-    **consult an expert nearby** (Kisan Call Centre 1800-180-1551,
-    Krishi Vigyan Kendra map search);
-  - viral diseases → remove infected plants and control the insect
-    vector, then expert; citrus greening → expert straight away.
-  Chemicals TNAU lists but that are banned or doubtful in India
-  (captafol, tridemorph, antibiotic sprays such as streptocycline) are
-  left out; see `_meta.excluded_from_tnau`. The plan file has **not been
-  reviewed by an agronomist** yet.
-- **Other crops** (`backend/knowledge/ai_condition_plans.json`): TNAU
-  plans for 20 diseases of papaya, banana, mango, brinjal, chilli, rice,
-  coconut and groundnut. Gemini may match a photo to one of them
-  (`ai_condition` in the `/analyze` response). The grower is shown TNAU's
-  symptom description and asked "Does your plant look like this?":
-  *Yes* gives the TNAU treatment, *Not sure* gives care steps first,
-  *No* gives general care.
-- **Accounts + history** (`/auth/*`, `/cases*`): sign in with email and
-  password and track a plan. Each step has a "check again on" date.
-  At the check the grower ticks *It worked* (case closed with a positive
-  message) or *It did not work*, optionally with a new photo. The photo
-  is re-analysed: a confident *different* disease starts that disease's
-  plan, and a confirmed uncertain diagnosis unlocks the TNAU treatment.
-  Otherwise the next step is suggested.
-
-- **Confirming an AI match:** the grower first confirms the crop ("Is
-  this a papaya plant?"), then answers 2–3 yes/no symptom checks
-  (`checks` in `ai_condition_plans.json`). All yes → TNAU treatment;
-  partly → care steps first; all no → general care. "Not sure? Ask an
-  expert first" offers the Kisan Call Centre and KVK links.
-- **Severity and outlook** (`backend/prediction/severity.py`,
-  `backend/services/severity_service.py`): share of leaf area that is
-  spotted / yellow / brown / powdery (OpenCV colour segmentation,
-  approximate), combined with the grower's "How much of the plant has
-  this?" (the worse one counts) → mild / moderate / severe. The outlook
-  is good / fair / poor with its reason, deliberately not a percentage.
-  At check-ins the new photo is compared with the last one: a shrinking
-  disease keeps the current step going once instead of switching
-  chemicals; a fast-spreading severe one goes straight to an expert.
-  The photo measure underestimates pale powdery mildew and virus
-  mottling, which is why the grower's estimate is included.
-
-- **Every screen in the farmer's language** (🌐 picker in the top bar):
-  plans, history cases, check-in forms and AI-match questions are
-  translated server-side (`translation_service.py`, `localize_service.py`,
-  labels from the allowlist in `ui_text.py`). Product names and doses are
-  never translated, and a translation that changes any number or
-  placeholder is rejected. Translations are cached in the `translations`
-  table, so each text costs one Gemini call per language.
-- **🔊 Read aloud** on "What to do now" and on every history case
-  (`POST /treatment-plan/speech`, `POST /cases/<id>/speech`): the server
-  builds the spoken text from its own data, so the key cannot be used
-  as a free TTS service.
-
-## Treatment kit checkout (PayPal sandbox + AI assistant)
-
-Knowing *what* to spray is only half the problem: the grower also has to
-work out *how much* to buy for their field and get it. Every treatment
-step that lists a TNAU product now has a **🛒 Get this treatment
-delivered** panel in the treatment history:
-
-1. **Size the kit.** Type the field size (acres, cents, hectares or square
-   metres) and the number of sprays, or tell the **AI assistant** in your
-   own words and language ("arai acre thakkali, rendu thadava", "I have 20
-   cents of chilli and already have mancozeb"). Gemini reads the area,
-   unit and sprays, picks one of the step's listed options (skipping one
-   the grower already has) and explains its choice in their language.
-2. **Kit maths** (`backend/services/kit_service.py`, deterministic): the
-   TNAU dose text is parsed ("0.25% (2.5 g per litre)", "200 ml per
-   acre", "50 g per 100 litres") and multiplied by the spray volume
-   (500 litres per hectare) or the area, times the sprays. The cheapest
-   combination of catalog packs that covers it is chosen
-   (`backend/knowledge/shop_catalog.json`, demo prices).
-3. **Pay with PayPal** (`backend/services/paypal_service.py`, Orders v2):
-   the server creates the order with itemised packs, reference
-   `case-<id>-step-<n>` and a unique invoice id; the grower approves it
-   in the PayPal window; the server captures it and checks the captured
-   amount matches before marking the order paid. The shipping address
-   comes from the buyer's PayPal account.
-4. **Next step, new kit.** If the step did not work, the plan moves to a
-   product from a different chemical group and the panel re-prices a kit
-   for the same field automatically (remembered from the last order).
-5. **Cancel and refund** a paid kit (Payments v2 full refund).
-
-Guardrails: the browser never sends prices (the server recomputes the
-kit from the curated plan when the order is created); the assistant can
-only choose between the step's listed products by number and may not
-write doses or product names; uncertain diagnoses get care steps only,
-so nothing can be bought until a diagnosis is confident.
-
-Routes: `GET /shop/config`, `POST /shop/cases/<id>/kit`,
-`POST /shop/cases/<id>/assistant`, `POST /shop/cases/<id>/orders`,
-`POST /shop/orders/<paypal_order_id>/capture`, `GET /shop/orders`,
-`POST /shop/orders/<id>/refund`.
-
-Setup: create a sandbox app at
-[developer.paypal.com](https://developer.paypal.com/dashboard/applications/sandbox)
-and set `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` (see `.env.example`).
-Pay with a sandbox **personal** account from the same dashboard. This is
-a demo store: no real money is taken and nothing is shipped.
-
-Data is stored with SQLAlchemy: SQLite at `instance/verdant.db` locally,
-Postgres in production via `DATABASE_URL`.
-
-## Deploy on Render (free plan)
-
-The web service runs the model as a compact TFLite file
-(`saved_models/plant_disease_cnn_int8.tflite`) with the LiteRT runtime,
-so it uses ~150 MB RAM instead of ~1.2 GB with full TensorFlow.
-
-1. Push this repository to GitHub.
-2. In Render: **New → Blueprint**, pick the repository. `render.yaml`
-   configures the build, start command and environment.
-3. When asked, enter your Gemini key for `LLM_API_KEY` (never commit it).
-4. Create a free Postgres database at [Neon](https://neon.tech) or
-   [Supabase](https://supabase.com) and enter its connection string for
-   `DATABASE_URL`. Render's own disk is wiped on every deploy and restart,
-   so without this, accounts and history are lost.
-   (`SECRET_KEY` is generated by Render automatically.)
-5. Open `https://<your-service>.onrender.com/app/`.
-
-Free instances sleep after 15 minutes without traffic; the first visit
-afterwards takes about a minute.
-
-To regenerate the TFLite model and its calibration:
+### Regenerate the TFLite model and its calibration
 
 ```
 python -m backend.training.export_tflite --variant int8
@@ -207,11 +240,6 @@ python -m backend.evaluation.collect_predictions
 python -m backend.evaluation.calibrate
 ```
 
-## Future Modules
+## License
 
-- Dataset Preparation
-- Image Preprocessing
-- CNN Model
-- Training
-- Prediction
-- Treatment Recommendation
+[MIT](LICENSE)
