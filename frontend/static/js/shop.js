@@ -387,7 +387,12 @@
 
       // Field size carried over from an order for an earlier step.
       const earlier = orders.find((o) => o.case_id === c.id && o.status === "paid" && o.step_number < step.number);
-      const rememberedText = !state.remembered || !state.quote || paid
+      // The field can come back from the server ("remembered") or be
+      // carried over in the browser from the previous step's kit.
+      const sameField = (a, b) =>
+        a && b && Number(a.area) === Number(b.area) && a.area_unit === b.area_unit && Number(a.sprays) === Number(b.sprays);
+      const fromEarlier = Boolean(earlier && state.quote && sameField(state.quote.field, earlier.field));
+      const rememberedText = !(state.remembered || fromEarlier) || !state.quote || paid || state.reply
         ? null
         : earlier
           ? h.T("Sized for your field from your step {n} order ({field}). That step did not work, so this kit uses a product from a different chemical group.", { n: earlier.step_number, field: state.quote.field_text })
