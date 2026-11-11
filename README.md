@@ -8,7 +8,7 @@ exact spray kit for their field, and lets them buy it with PayPal.**
 |---|---|
 | 🌐 **Live demo** | [plant-disease-detection-p7f3.onrender.com/app](https://plant-disease-detection-p7f3.onrender.com/app/) (the free server sleeps when idle; the first load can take about a minute) |
 | 🎬 **Video (under 3 min)** | _link added on submission_ |
-| 🧪 **PayPal sandbox buyer** | email `sb-cziqj53836512@personal.example.com` · password `a__kS0hT` (fake sandbox account, no real money) |
+| 🧪 **PayPal sandbox buyer** | email `sb-cziqj53836512@personal.example.com` · password `12345678` (fake sandbox account, no real money) |
 | 📄 **License** | [MIT](LICENSE) |
 
 Built for the **PayPal AI Hackathon** (Devpost, Oct 1 – Nov 12, 2026).
@@ -115,6 +115,16 @@ pay on its own.
 
 > If the diagnosis is *uncertain*, Verdant deliberately offers only
 > low-risk care steps and nothing to buy. Use a clearer photo.
+
+**About speed (free tiers).** The AI features use Google Gemini's free
+tier, which is often busy: plant identification, the AI assistant,
+treatment guidance and translations can take 10–40 seconds, and the
+first switch to a new language takes longest (later views are cached).
+Verdant falls back across several free Gemini models automatically. If
+the assistant still says it is busy, enter the area and sprays in the
+form and click **Calculate kit**: the kit, prices and PayPal checkout do
+not depend on Gemini. The disease diagnosis (our CNN) runs on the server
+and does not depend on Gemini either.
 
 ## Run it locally
 
