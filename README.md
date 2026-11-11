@@ -7,7 +7,7 @@ exact spray kit for their field, and lets them buy it with PayPal.**
 | | |
 |---|---|
 | 🌐 **Live demo** | [plant-disease-detection-p7f3.onrender.com/app](https://plant-disease-detection-p7f3.onrender.com/app/) (the free server sleeps when idle; the first load can take about a minute) |
-| 🎬 **Video (under 3 min)** | _link added on submission_ |
+| 🎬 **Video (under 3 min)** | [youtube.com/watch?v=5rbRbvWOevU](https://www.youtube.com/watch?v=5rbRbvWOevU) |
 | 🧪 **PayPal sandbox buyer** | email `sb-cziqj53836512@personal.example.com` · password `12345678` (fake sandbox account, no real money) |
 | 📄 **License** | [MIT](LICENSE) |
 
